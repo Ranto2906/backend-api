@@ -2,7 +2,9 @@ package com.seimad.patrimoine.controller.auth;
 
 import com.seimad.patrimoine.dto.auth.JournalConnexionDTO;
 import com.seimad.patrimoine.dto.auth.SessionDTO;
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.service.auth.JournalService;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ import java.util.List;
 public class AdminController {
 
     private final JournalService journalService;
+    private final AuditService auditService;
 
     /**
      * GET /api/admin/journal — Journal paginé de toutes les connexions.
@@ -71,6 +74,42 @@ public class AdminController {
             @PathVariable Integer idUtilisateur) {
         return ResponseEntity.ok(journalService.listerSessionsParUtilisateur(idUtilisateur));
     }
+
+    // ── Audit ──
+
+    /**
+     * GET /api/admin/audit — Journal d'audit paginé.
+     */
+    @GetMapping("/audit")
+    @PreAuthorize("hasRole('Administrateur')")
+    @Operation(summary = "Journal d'audit",
+               description = "Retourne le journal d'audit avec filtres optionnels sur l'entité, l'action et la recherche")
+    public ResponseEntity<Page<AuditDTO>> audit(
+            @RequestParam(required = false) String entiteType,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+        return ResponseEntity.ok(auditService.rechercher(entiteType, action, search, pageable));
+    }
+
+    /**
+     * GET /api/admin/audit/stats — Statistiques de l'audit.
+     */
+    @GetMapping("/audit/stats")
+    @PreAuthorize("hasRole('Administrateur')")
+    @Operation(summary = "Statistiques de l'audit")
+    public ResponseEntity<java.util.Map<String, Object>> auditStats() {
+        java.util.Map<String, Object> stats = new java.util.LinkedHashMap<>();
+        stats.put("dossier", auditService.countByEntiteType("dossier"));
+        stats.put("utilisateur", auditService.countByEntiteType("utilisateur"));
+        stats.put("parcelle", auditService.countByEntiteType("parcelle"));
+        stats.put("titre_foncier", auditService.countByEntiteType("titre_foncier"));
+        stats.put("geometrie", auditService.countByEntiteType("geometrie"));
+        stats.put("signalement", auditService.countByEntiteType("signalement"));
+        return ResponseEntity.ok(stats);
+    }
+
+    // ── Sessions ──
 
     /**
      * POST /api/admin/sessions/{idUtilisateur}/revoquer — Révoque toutes les sessions d'un utilisateur.

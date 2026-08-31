@@ -9,6 +9,7 @@ import com.seimad.patrimoine.repository.auth.SessionUtilisateurRepository;
 import com.seimad.patrimoine.repository.auth.UtilisateurRepository;
 import com.seimad.patrimoine.security.CustomUserDetailsService;
 import com.seimad.patrimoine.security.JwtTokenProvider;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -33,6 +35,7 @@ public class AuthService {
     private final JournalConnexionRepository journalConnexionRepository;
     private final SessionUtilisateurRepository sessionUtilisateurRepository;
     private final CustomUserDetailsService userDetailsService;
+    private final AuditService auditService;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_DURATION_MINUTES = 30;
@@ -71,6 +74,7 @@ public class AuthService {
             utilisateurRepository.save(utilisateur);
 
             enregistrerConnexion(utilisateur, true, httpRequest);
+            auditService.enregistrer("utilisateur", String.valueOf(utilisateur.getIdUtilisateur()), "READ", null, Map.of("action", "login_succes"), utilisateur, httpRequest);
 
             var userDetails = userDetailsService.loadUserById(utilisateur.getIdUtilisateur());
             java.util.List<String> roles = userDetailsService.getUserRoleNames(utilisateur);
@@ -150,6 +154,7 @@ public class AuthService {
                     .ifPresent(session -> {
                         session.setRevoque(true);
                         sessionUtilisateurRepository.save(session);
+                        auditService.enregistrer("utilisateur", String.valueOf(session.getUtilisateur().getIdUtilisateur()), "READ", null, Map.of("action", "logout"), session.getUtilisateur());
                     });
         }
         SecurityContextHolder.clearContext();

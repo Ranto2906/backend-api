@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -22,6 +23,7 @@ public class JournalService {
 
     private final JournalConnexionRepository journalRepository;
     private final SessionUtilisateurRepository sessionRepository;
+    private final com.seimad.patrimoine.service.dossier.AuditService auditService;
 
     public Page<JournalConnexionDTO> listerJournal(Pageable pageable) {
         return journalRepository.findAllByOrderByDateConnexionDesc(pageable)
@@ -47,12 +49,14 @@ public class JournalService {
         sessionRepository.saveAll(sessions);
 
         log.info("Toutes les sessions de l'utilisateur {} ont été révoquées", idUtilisateur);
+        auditService.enregistrer("utilisateur", String.valueOf(idUtilisateur), "UPDATE", null, Map.of("action", "revoke_sessions", "count", sessions.size()));
     }
 
     @Transactional
     public void nettoyerSessionsExpirees() {
         sessionRepository.deleteByDateExpirationBefore(java.time.LocalDateTime.now());
         log.info("Sessions expirées nettoyées");
+        auditService.enregistrer("utilisateur", "0", "DELETE", null, Map.of("action", "clean_expired_sessions"));
     }
 
     // ── Sessions ──

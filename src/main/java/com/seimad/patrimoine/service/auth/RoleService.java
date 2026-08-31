@@ -3,6 +3,8 @@ package com.seimad.patrimoine.service.auth;
 import com.seimad.patrimoine.dto.auth.*;
 import com.seimad.patrimoine.entity.auth.*;
 import com.seimad.patrimoine.repository.auth.*;
+import com.seimad.patrimoine.service.dossier.AuditService;
+import com.seimad.patrimoine.entity.auth.Utilisateur;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class RoleService {
     private final ModuleRepository moduleRepository;
     private final EntiteRepository entiteRepository;
     private final ActionRepository actionRepository;
+    private final AuditService auditService;
 
     public List<RoleDTO> lister() {
         return roleRepository.findAll().stream()
@@ -46,6 +49,7 @@ public class RoleService {
                 .build();
         role = roleRepository.save(role);
         log.info("Rôle créé : {} (id={})", role.getNomRole(), role.getIdRole());
+        auditService.enregistrer("role", String.valueOf(role.getIdRole()), "CREATE", null, Map.of("nomRole", role.getNomRole(), "description", role.getDescription() != null ? role.getDescription() : ""));
         return toDTO(role);
     }
 
@@ -53,6 +57,7 @@ public class RoleService {
     public RoleDTO mettreAJour(Integer id, CreateRoleRequest request) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Rôle non trouvé avec l'id : " + id));
+        Map<String, Object> avant = Map.of("nomRole", role.getNomRole(), "description", role.getDescription() != null ? role.getDescription() : "");
         if (!request.getNomRole().equals(role.getNomRole())
                 && roleRepository.existsByNomRole(request.getNomRole())) {
             throw new IllegalArgumentException("Le rôle '" + request.getNomRole() + "' existe déjà");
@@ -61,6 +66,7 @@ public class RoleService {
         role.setDescription(request.getDescription());
         role = roleRepository.save(role);
         log.info("Rôle mis à jour : {} (id={})", role.getNomRole(), id);
+        auditService.enregistrer("role", String.valueOf(id), "UPDATE", avant, Map.of("nomRole", role.getNomRole()));
         return toDTO(role);
     }
 
@@ -71,6 +77,7 @@ public class RoleService {
         rolePermissionRepository.deleteAllByRoleIdRole(id);
         roleRepository.delete(role);
         log.info("Rôle supprimé : {} (id={})", role.getNomRole(), id);
+        auditService.enregistrer("role", String.valueOf(id), "DELETE", Map.of("nomRole", role.getNomRole()), null);
     }
 
     public List<PermissionDTO> listerPermissions() {
@@ -118,12 +125,14 @@ public class RoleService {
                 .idPermission(idPermission)
                 .build());
         log.info("Permission {} attribuée au rôle {}", idPermission, idRole);
+        auditService.enregistrer("role", String.valueOf(idRole), "UPDATE", null, Map.of("action", "assign_permission", "permissionId", idPermission));
     }
 
     @Transactional
     public void retirerPermission(Integer idRole, Integer idPermission) {
         rolePermissionRepository.deleteById(new RolePermissionId(idRole, idPermission));
         log.info("Permission {} retirée du rôle {}", idPermission, idRole);
+        auditService.enregistrer("role", String.valueOf(idRole), "UPDATE", null, Map.of("action", "remove_permission", "permissionId", idPermission));
     }
 
     public List<Map<String, Object>> listerModules() {
