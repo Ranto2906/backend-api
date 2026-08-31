@@ -1,6 +1,7 @@
 package com.seimad.patrimoine.controller.auth;
 
 import com.seimad.patrimoine.dto.auth.JournalConnexionDTO;
+import com.seimad.patrimoine.dto.auth.SessionDTO;
 import com.seimad.patrimoine.service.auth.JournalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -47,6 +48,28 @@ public class AdminController {
     public ResponseEntity<List<JournalConnexionDTO>> journalUtilisateur(
             @PathVariable Integer idUtilisateur) {
         return ResponseEntity.ok(journalService.listerParUtilisateur(idUtilisateur));
+    }
+
+    /**
+     * GET /api/admin/sessions — Liste paginée de toutes les sessions.
+     */
+    @GetMapping("/sessions")
+    @PreAuthorize("hasRole('Administrateur')")
+    @Operation(summary = "Lister les sessions",
+               description = "Retourne toutes les sessions (actives et révoquées) de manière paginée")
+    public ResponseEntity<Page<SessionDTO>> listerSessions(Pageable pageable) {
+        return ResponseEntity.ok(journalService.listerSessions(pageable));
+    }
+
+    /**
+     * GET /api/admin/sessions/{idUtilisateur} — Sessions d'un utilisateur.
+     */
+    @GetMapping("/sessions/{idUtilisateur}")
+    @PreAuthorize("hasRole('Administrateur')")
+    @Operation(summary = "Sessions d'un utilisateur")
+    public ResponseEntity<List<SessionDTO>> sessionsUtilisateur(
+            @PathVariable Integer idUtilisateur) {
+        return ResponseEntity.ok(journalService.listerSessionsParUtilisateur(idUtilisateur));
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.seimad.patrimoine.repository.auth;
 
 import com.seimad.patrimoine.entity.auth.SessionUtilisateur;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,4 +20,10 @@ public interface SessionUtilisateurRepository extends JpaRepository<SessionUtili
     void deleteByDateExpirationBefore(LocalDateTime date);
 
     void deleteByUtilisateurIdUtilisateurAndRevoqueFalse(Integer idUtilisateur);
+
+    Page<SessionUtilisateur> findAllByOrderByDateCreationDesc(Pageable pageable);
+
+    List<SessionUtilisateur> findAllByOrderByDateCreationDesc();
+
+    List<SessionUtilisateur> findByUtilisateurIdUtilisateurOrderByDateCreationDesc(Integer idUtilisateur);
 }
