@@ -1,0 +1,31 @@
+package com.seimad.patrimoine.entity.notification;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "personne")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Personne {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id_personne")
+    private Integer idPersonne;
+
+    @Column(name = "nom", nullable = false, length = 200)
+    private String nom;
+
+    @Column(name = "contact", length = 100)
+    private String contact;
+
+    @Column(name = "adresse", columnDefinition = "TEXT")
+    private String adresse;
+
+    @Column(name = "role", length = 50)
+    private String role;
+}
