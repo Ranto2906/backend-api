@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,8 +47,10 @@ public class PersonneService {
                 .nom(request.getNom())
                 .contact(request.getContact())
                 .adresse(request.getAdresse())
+                .email(request.getEmail())
                 .role(request.getRole())
                 .build();
+        // @PrePersist on entity set date = LocalDateTime.now() if null
         return toDTO(personneRepository.save(personne));
     }
 
@@ -58,6 +61,8 @@ public class PersonneService {
         personne.setNom(request.getNom());
         personne.setContact(request.getContact());
         personne.setAdresse(request.getAdresse());
+        personne.setEmail(request.getEmail());
+        personne.setDate(LocalDateTime.now());
         personne.setRole(request.getRole());
         return toDTO(personneRepository.save(personne));
     }
@@ -83,6 +88,16 @@ public class PersonneService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public Page<PersonneDTO> rechercherParDateRange(LocalDateTime dateDebut, LocalDateTime dateFin, Pageable pageable) {
+        return personneRepository.searchByDateRange(dateDebut, dateFin, pageable).map(this::toDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PersonneDTO> rechercherAvecFiltres(String search, LocalDateTime dateDebut, LocalDateTime dateFin, Pageable pageable) {
+        return personneRepository.searchWithFilters(search, dateDebut, dateFin, pageable).map(this::toDTO);
+    }
+
     // ── Helpers ──
 
     private PersonneDTO toDTO(Personne p) {
@@ -91,6 +106,8 @@ public class PersonneService {
                 .nom(p.getNom())
                 .contact(p.getContact())
                 .adresse(p.getAdresse())
+                .email(p.getEmail())
+                .date(p.getDate())
                 .role(p.getRole())
                 .build();
     }

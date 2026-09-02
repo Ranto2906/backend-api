@@ -2,6 +2,7 @@ package com.seimad.patrimoine.entity.notification;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "personne")
@@ -26,6 +27,19 @@ public class Personne {
     @Column(name = "adresse", columnDefinition = "TEXT")
     private String adresse;
 
+    @Column(name = "email", columnDefinition = "TEXT")
+    private String email;
+
+    @Column(name = "date")
+    private LocalDateTime date;
+
     @Column(name = "role", length = 50)
     private String role;
+
+    @PrePersist
+    protected void onCreate() {
+        if (date == null) {
+            date = LocalDateTime.now();
+        }
+    }
 }

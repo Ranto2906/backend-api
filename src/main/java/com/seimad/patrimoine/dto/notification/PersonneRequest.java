@@ -17,4 +17,5 @@ public class PersonneRequest {
     private String contact;
     private String adresse;
     private String role;
+    private String email;
 }

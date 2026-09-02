@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -75,5 +76,24 @@ public class PersonneController {
     @Operation(summary = "Rechercher des personnes par nom")
     public ResponseEntity<List<PersonneDTO>> rechercherParNom(@RequestParam String nom) {
         return ResponseEntity.ok(personneService.rechercherParNom(nom));
+    }
+
+    @GetMapping("/search/date-range")
+    @Operation(summary = "Rechercher des personnes par plage de dates")
+    public ResponseEntity<Page<PersonneDTO>> rechercherParDateRange(
+            @RequestParam(required = false) LocalDateTime dateDebut,
+            @RequestParam(required = false) LocalDateTime dateFin,
+            Pageable pageable) {
+        return ResponseEntity.ok(personneService.rechercherParDateRange(dateDebut, dateFin, pageable));
+    }
+
+    @GetMapping("/search/advanced")
+    @Operation(summary = "Rechercher des personnes avec filtres (texte + date)")
+    public ResponseEntity<Page<PersonneDTO>> rechercherAvecFiltres(
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(required = false) LocalDateTime dateDebut,
+            @RequestParam(required = false) LocalDateTime dateFin,
+            Pageable pageable) {
+        return ResponseEntity.ok(personneService.rechercherAvecFiltres(search, dateDebut, dateFin, pageable));
     }
 }

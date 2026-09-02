@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Repository
 public interface PersonneRepository extends JpaRepository<Personne, Integer> {
@@ -21,6 +22,25 @@ public interface PersonneRepository extends JpaRepository<Personne, Integer> {
            "(:search IS NULL OR :search = '' OR " +
            "LOWER(p.nom) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
            "LOWER(p.contact) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(p.adresse) LIKE LOWER(CONCAT('%',:search,'%')))")
+           "LOWER(p.adresse) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(p.email) LIKE LOWER(CONCAT('%',:search,'%')))") 
     Page<Personne> search(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT p FROM Personne p WHERE " +
+           "(:dateDebut IS NULL OR p.date >= :dateDebut) AND " +
+           "(:dateFin IS NULL OR p.date <= :dateFin)")
+    Page<Personne> searchByDateRange(@Param("dateDebut") LocalDateTime dateDebut, 
+                                      @Param("dateFin") LocalDateTime dateFin, 
+                                      Pageable pageable);
+
+    @Query("SELECT p FROM Personne p WHERE " +
+           "(:search IS NULL OR :search = '' OR " +
+           "LOWER(p.nom) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(p.email) LIKE LOWER(CONCAT('%',:search,'%'))) AND " +
+           "(:dateDebut IS NULL OR p.date >= :dateDebut) AND " +
+           "(:dateFin IS NULL OR p.date <= :dateFin)")
+    Page<Personne> searchWithFilters(@Param("search") String search, 
+                                      @Param("dateDebut") LocalDateTime dateDebut,
+                                      @Param("dateFin") LocalDateTime dateFin,
+                                      Pageable pageable);
 }

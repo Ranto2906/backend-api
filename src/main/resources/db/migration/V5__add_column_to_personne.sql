@@ -1,0 +1,2 @@
+ALTER TABLE personne
+ADD email VARCHAR(100) NULL;
