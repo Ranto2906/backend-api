@@ -4,6 +4,7 @@ import com.seimad.patrimoine.dto.notification.PersonneDTO;
 import com.seimad.patrimoine.dto.notification.PersonneRequest;
 import com.seimad.patrimoine.entity.notification.Personne;
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class PersonneService {
 
     private final PersonneRepository personneRepository;
+    private final AuditService auditService;
 
     // ── CRUD ──
 
@@ -58,13 +60,42 @@ public class PersonneService {
     public PersonneDTO mettreAJour(Integer id, PersonneRequest request) {
         Personne personne = personneRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Personne non trouvée avec l'id : " + id));
+
+        // ── Enregistrer les anciennes valeurs AVANT modification ──
+        Map<String, Object> anciennesValeurs = new LinkedHashMap<>();
+        anciennesValeurs.put("nom", personne.getNom());
+        anciennesValeurs.put("contact", personne.getContact());
+        anciennesValeurs.put("email", personne.getEmail());
+        anciennesValeurs.put("adresse", personne.getAdresse());
+        anciennesValeurs.put("role", personne.getRole());
+
+        // ── Appliquer les nouvelles valeurs ──
+        Map<String, Object> nouvellesValeurs = new LinkedHashMap<>();
+        nouvellesValeurs.put("nom", request.getNom());
+        nouvellesValeurs.put("contact", request.getContact());
+        nouvellesValeurs.put("email", request.getEmail());
+        nouvellesValeurs.put("adresse", request.getAdresse());
+        nouvellesValeurs.put("role", request.getRole());
+
         personne.setNom(request.getNom());
         personne.setContact(request.getContact());
         personne.setAdresse(request.getAdresse());
         personne.setEmail(request.getEmail());
         personne.setDate(LocalDateTime.now());
         personne.setRole(request.getRole());
-        return toDTO(personneRepository.save(personne));
+
+        PersonneDTO result = toDTO(personneRepository.save(personne));
+
+        // ── Enregistrer l'audit ──
+        auditService.enregistrer(
+                "personne",
+                String.valueOf(id),
+                "MODIFICATION",
+                anciennesValeurs,
+                nouvellesValeurs
+        );
+
+        return result;
     }
 
     @Transactional

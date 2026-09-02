@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -84,6 +85,20 @@ public class AuditService {
 
     public long countByAction(String action) {
         return auditRepository.countByAction(action);
+    }
+
+    // ── Historique d'une entité spécifique ──
+
+    public List<AuditDTO> historiqueEntite(String entiteType, String entiteId) {
+        return auditRepository.findByEntiteTypeAndEntiteIdOrderByDateActionDesc(entiteType, entiteId)
+                .stream()
+                .map(this::toDTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public AuditDTO derniereModification(String entiteType, String entiteId) {
+        List<Audit> audits = auditRepository.findByEntiteTypeAndEntiteIdOrderByDateActionDesc(entiteType, entiteId);
+        return audits.isEmpty() ? null : toDTO(audits.get(0));
     }
 
     // ── Helpers ──

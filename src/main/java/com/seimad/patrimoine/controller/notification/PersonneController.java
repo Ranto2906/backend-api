@@ -1,7 +1,9 @@
 package com.seimad.patrimoine.controller.notification;
 
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.notification.PersonneDTO;
 import com.seimad.patrimoine.dto.notification.PersonneRequest;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import com.seimad.patrimoine.service.notification.PersonneService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +26,7 @@ import java.util.List;
 public class PersonneController {
 
     private final PersonneService personneService;
+    private final AuditService auditService;
 
     @GetMapping
     @Operation(summary = "Lister les personnes (pagination)")
@@ -64,6 +67,19 @@ public class PersonneController {
     public ResponseEntity<Void> supprimer(@PathVariable Integer id) {
         personneService.supprimer(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/historique")
+    @Operation(summary = "Historique des modifications d'une personne")
+    public ResponseEntity<List<AuditDTO>> historique(@PathVariable Integer id) {
+        return ResponseEntity.ok(auditService.historiqueEntite("personne", String.valueOf(id)));
+    }
+
+    @GetMapping("/{id}/derniere-modification")
+    @Operation(summary = "Dernière modification d'une personne (anciennes valeurs)")
+    public ResponseEntity<AuditDTO> derniereModification(@PathVariable Integer id) {
+        AuditDTO audit = auditService.derniereModification("personne", String.valueOf(id));
+        return audit != null ? ResponseEntity.ok(audit) : ResponseEntity.noContent().build();
     }
 
     @GetMapping("/role/{role}")

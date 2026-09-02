@@ -33,4 +33,6 @@ public interface AuditRepository extends JpaRepository<Audit, Integer> {
     long countByEntiteType(String entiteType);
 
     long countByAction(String action);
+
+    List<Audit> findByEntiteTypeAndEntiteIdOrderByDateActionDesc(String entiteType, String entiteId);
 }

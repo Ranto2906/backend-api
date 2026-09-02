@@ -326,7 +326,7 @@ CREATE TABLE audit(
    entite_type VARCHAR(30) NOT NULL
       CHECK(entite_type IN('dossier','notification_occupation','avertissement',
                             'parcelle','titre_foncier','propriete','utilisateur',
-                            'geometrie','signalement','descente_terrain')),   -- CORRECTION 5
+                            'geometrie','signalement','descente_terrain','personne')),   -- CORRECTION 5 + personne
    entite_id TEXT NOT NULL,
    action VARCHAR(20),
    anciennes_valeurs JSONB,
