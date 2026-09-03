@@ -1,7 +1,9 @@
 package com.seimad.patrimoine.controller.referentiel;
 
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.referentiel.PrixM2DTO;
 import com.seimad.patrimoine.dto.referentiel.PrixM2Request;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import com.seimad.patrimoine.service.referentiel.PrixM2Service;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +25,7 @@ import java.util.List;
 public class PrixM2Controller {
 
     private final PrixM2Service prixM2Service;
+    private final AuditService auditService;
 
     @GetMapping
     @Operation(summary = "Lister les prix (pagination)")
@@ -59,5 +62,18 @@ public class PrixM2Controller {
     public ResponseEntity<Void> supprimer(@PathVariable Integer id) {
         prixM2Service.supprimer(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/historique")
+    @Operation(summary = "Historique des modifications d'un prix")
+    public ResponseEntity<List<AuditDTO>> historique(@PathVariable Integer id) {
+        return ResponseEntity.ok(auditService.historiqueEntite("prix_m2", String.valueOf(id)));
+    }
+
+    @GetMapping("/{id}/derniere-modification")
+    @Operation(summary = "Dernière modification d'un prix")
+    public ResponseEntity<AuditDTO> derniereModification(@PathVariable Integer id) {
+        AuditDTO audit = auditService.derniereModification("prix_m2", String.valueOf(id));
+        return audit != null ? ResponseEntity.ok(audit) : ResponseEntity.noContent().build();
     }
 }
