@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.entity.dossier;
 
+import com.seimad.patrimoine.entity.notification.Personne;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,8 +21,8 @@ public class DossierDemandeur {
     private Integer idDossier;
 
     @Id
-    @Column(name = "id_demandeur")
-    private Integer idDemandeur;
+    @Column(name = "id_personne")
+    private Integer idPersonne;
 
     @Column(name = "role", length = 30)
     @Builder.Default
@@ -36,6 +37,6 @@ public class DossierDemandeur {
     private Dossier dossier;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_demandeur", insertable = false, updatable = false)
-    private Demandeur demandeur;
+    @JoinColumn(name = "id_personne", insertable = false, updatable = false)
+    private Personne personne;
 }

@@ -3,6 +3,8 @@ package com.seimad.patrimoine.controller.notification;
 import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.notification.PersonneDTO;
 import com.seimad.patrimoine.dto.notification.PersonneRequest;
+import com.seimad.patrimoine.dto.notification.TypePersonneDTO;
+import com.seimad.patrimoine.entity.notification.TypePersonne;
 import com.seimad.patrimoine.service.dossier.AuditService;
 import com.seimad.patrimoine.service.notification.PersonneService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +34,19 @@ public class PersonneController {
     @Operation(summary = "Lister les personnes (pagination)")
     public ResponseEntity<Page<PersonneDTO>> lister(Pageable pageable) {
         return ResponseEntity.ok(personneService.lister(pageable));
+    }
+
+    @GetMapping("/types")
+    @Operation(summary = "Lister les types de personne (référentiel)")
+    public ResponseEntity<List<TypePersonneDTO>> listerTypes() {
+        List<TypePersonneDTO> dtos = personneService.listerTypes().stream()
+                .map(t -> TypePersonneDTO.builder()
+                        .idTypePersonne(t.getIdTypePersonne())
+                        .code(t.getCode())
+                        .libelle(t.getLibelle())
+                        .build())
+                .toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/search")

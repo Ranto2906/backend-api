@@ -36,6 +36,10 @@ public class Personne {
     @Column(name = "role", length = 50)
     private String role;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_type_personne")
+    private TypePersonne typePersonne;
+
     @PrePersist
     protected void onCreate() {
         if (date == null) {

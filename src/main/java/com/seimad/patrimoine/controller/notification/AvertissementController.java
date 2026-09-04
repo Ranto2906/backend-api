@@ -1,7 +1,9 @@
 package com.seimad.patrimoine.controller.notification;
 
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.notification.AvertissementDTO;
 import com.seimad.patrimoine.dto.notification.AvertissementRequest;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import com.seimad.patrimoine.service.notification.AvertissementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +27,7 @@ import java.util.UUID;
 public class AvertissementController {
 
     private final AvertissementService avertissementService;
+    private final AuditService auditService;
 
     @GetMapping
     @Operation(summary = "Lister les avertissements (pagination)")
@@ -65,6 +68,19 @@ public class AvertissementController {
     public ResponseEntity<Void> supprimer(@PathVariable UUID id) {
         avertissementService.supprimer(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/historique")
+    @Operation(summary = "Historique des modifications d'un avertissement")
+    public ResponseEntity<List<AuditDTO>> historique(@PathVariable UUID id) {
+        return ResponseEntity.ok(auditService.historiqueEntite("avertissement", id.toString()));
+    }
+
+    @GetMapping("/{id}/derniere-modification")
+    @Operation(summary = "Dernière modification d'un avertissement (anciennes valeurs)")
+    public ResponseEntity<AuditDTO> derniereModification(@PathVariable UUID id) {
+        AuditDTO audit = auditService.derniereModification("avertissement", id.toString());
+        return audit != null ? ResponseEntity.ok(audit) : ResponseEntity.noContent().build();
     }
 
     // ── Recherches par critère ──

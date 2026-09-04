@@ -10,6 +10,7 @@ import com.seimad.patrimoine.repository.notification.AvertissementRepository;
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
 import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -17,7 +18,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,6 +33,7 @@ public class AvertissementService {
     private final PersonneRepository personneRepository;
     private final ParcelleRepository parcelleRepository;
     private final TitreFoncierRepository titreFoncierRepository;
+    private final AuditService auditService;
 
     // ── CRUD ──
 
@@ -72,13 +76,27 @@ public class AvertissementService {
                 .titreFoncier(titreFoncier)
                 .parcelle(parcelle)
                 .build();
-        return toDTO(avertissementRepository.save(avertissement));
+        Avertissement saved = avertissementRepository.save(avertissement);
+
+        // ── Enregistrer l'audit de création ──
+        auditService.enregistrer(
+                "avertissement",
+                saved.getIdAvertissement().toString(),
+                "CREATE",
+                null,
+                valeursAudit(saved)
+        );
+
+        return toDTO(saved);
     }
 
     @Transactional
     public AvertissementDTO mettreAJour(UUID id, AvertissementRequest request) {
         Avertissement avertissement = avertissementRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Avertissement non trouvé avec l'id : " + id));
+
+        // ── Anciennes valeurs AVANT modification ──
+        Map<String, Object> anciennesValeurs = valeursAudit(avertissement);
 
         Personne personne = personneRepository.findById(request.getIdPersonne())
                 .orElseThrow(() -> new RuntimeException("Personne non trouvée avec l'id : " + request.getIdPersonne()));
@@ -98,11 +116,37 @@ public class AvertissementService {
         avertissement.setTitreFoncier(titreFoncier);
         avertissement.setParcelle(parcelle);
 
-        return toDTO(avertissementRepository.save(avertissement));
+        Avertissement saved = avertissementRepository.save(avertissement);
+
+        // ── Enregistrer l'audit de modification ──
+        auditService.enregistrer(
+                "avertissement",
+                id.toString(),
+                "UPDATE",
+                anciennesValeurs,
+                valeursAudit(saved)
+        );
+
+        return toDTO(saved);
     }
 
     @Transactional
     public void supprimer(UUID id) {
+        Avertissement avertissement = avertissementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Avertissement non trouvé avec l'id : " + id));
+
+        // ── Anciennes valeurs AVANT suppression ──
+        Map<String, Object> anciennesValeurs = valeursAudit(avertissement);
+
+        // ── Enregistrer l'audit de suppression ──
+        auditService.enregistrer(
+                "avertissement",
+                id.toString(),
+                "DELETE",
+                anciennesValeurs,
+                null
+        );
+
         avertissementRepository.deleteById(id);
     }
 
@@ -144,6 +188,27 @@ public class AvertissementService {
     }
 
     // ── Helpers ──
+
+    /**
+     * Construit la carte des valeurs (audit) d'un avertissement :
+     * champs métier + libellés lisibles (n° titre, n° lot, personne).
+     */
+    private Map<String, Object> valeursAudit(Avertissement a) {
+        Map<String, Object> valeurs = new LinkedHashMap<>();
+        valeurs.put("dateAvertissement", a.getDateAvertissement());
+        valeurs.put("annee", a.getAnnee());
+        valeurs.put("informationsOccupants", a.getInformationsOccupants());
+        valeurs.put("constats", a.getConstats());
+        valeurs.put("actionsEntreprises", a.getActionsEntreprises());
+        valeurs.put("aFaire", a.getAFaire());
+        valeurs.put("mission", a.getMission());
+        valeurs.put("numeroTitre", a.getTitreFoncier() != null ? a.getTitreFoncier().getNumero() : null);
+        valeurs.put("numeroLot", a.getParcelle() != null ? a.getParcelle().getNumeroLot() : null);
+
+        Personne p = a.getPersonne();
+        valeurs.put("personne", p != null ? p.getNom() : null);
+        return valeurs;
+    }
 
     private AvertissementDTO toDTO(Avertissement a) {
         return AvertissementDTO.builder()

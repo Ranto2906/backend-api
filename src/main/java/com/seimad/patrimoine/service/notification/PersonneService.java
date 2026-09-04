@@ -3,7 +3,9 @@ package com.seimad.patrimoine.service.notification;
 import com.seimad.patrimoine.dto.notification.PersonneDTO;
 import com.seimad.patrimoine.dto.notification.PersonneRequest;
 import com.seimad.patrimoine.entity.notification.Personne;
+import com.seimad.patrimoine.entity.notification.TypePersonne;
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
+import com.seimad.patrimoine.repository.notification.TypePersonneRepository;
 import com.seimad.patrimoine.service.dossier.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +24,15 @@ import java.util.stream.Collectors;
 public class PersonneService {
 
     private final PersonneRepository personneRepository;
+    private final TypePersonneRepository typePersonneRepository;
     private final AuditService auditService;
+
+    // ── Référentiel type ──
+
+    @Transactional(readOnly = true)
+    public List<TypePersonne> listerTypes() {
+        return typePersonneRepository.findAllByOrderByLibelleAsc();
+    }
 
     // ── CRUD ──
 
@@ -45,12 +55,14 @@ public class PersonneService {
 
     @Transactional
     public PersonneDTO creer(PersonneRequest request) {
+        TypePersonne type = trouverType(request.getIdTypePersonne());
         Personne personne = Personne.builder()
                 .nom(request.getNom())
                 .contact(request.getContact())
                 .adresse(request.getAdresse())
                 .email(request.getEmail())
-                .role(request.getRole())
+                .role(type != null ? type.getLibelle() : request.getRole())
+                .typePersonne(type)
                 .build();
         // @PrePersist on entity set date = LocalDateTime.now() if null
         return toDTO(personneRepository.save(personne));
@@ -61,6 +73,8 @@ public class PersonneService {
         Personne personne = personneRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Personne non trouvée avec l'id : " + id));
 
+        TypePersonne type = trouverType(request.getIdTypePersonne());
+
         // ── Enregistrer les anciennes valeurs AVANT modification ──
         Map<String, Object> anciennesValeurs = new LinkedHashMap<>();
         anciennesValeurs.put("nom", personne.getNom());
@@ -68,6 +82,8 @@ public class PersonneService {
         anciennesValeurs.put("email", personne.getEmail());
         anciennesValeurs.put("adresse", personne.getAdresse());
         anciennesValeurs.put("role", personne.getRole());
+        anciennesValeurs.put("typePersonne", personne.getTypePersonne() != null
+                ? personne.getTypePersonne().getLibelle() : null);
 
         // ── Appliquer les nouvelles valeurs ──
         Map<String, Object> nouvellesValeurs = new LinkedHashMap<>();
@@ -75,14 +91,16 @@ public class PersonneService {
         nouvellesValeurs.put("contact", request.getContact());
         nouvellesValeurs.put("email", request.getEmail());
         nouvellesValeurs.put("adresse", request.getAdresse());
-        nouvellesValeurs.put("role", request.getRole());
+        nouvellesValeurs.put("role", type != null ? type.getLibelle() : request.getRole());
+        nouvellesValeurs.put("typePersonne", type != null ? type.getLibelle() : null);
 
         personne.setNom(request.getNom());
         personne.setContact(request.getContact());
         personne.setAdresse(request.getAdresse());
         personne.setEmail(request.getEmail());
         personne.setDate(LocalDateTime.now());
-        personne.setRole(request.getRole());
+        personne.setRole(type != null ? type.getLibelle() : request.getRole());
+        personne.setTypePersonne(type);
 
         PersonneDTO result = toDTO(personneRepository.save(personne));
 
@@ -131,7 +149,13 @@ public class PersonneService {
 
     // ── Helpers ──
 
+    private TypePersonne trouverType(Integer id) {
+        if (id == null) return null;
+        return typePersonneRepository.findById(id).orElse(null);
+    }
+
     private PersonneDTO toDTO(Personne p) {
+        TypePersonne type = p.getTypePersonne();
         return PersonneDTO.builder()
                 .idPersonne(p.getIdPersonne())
                 .nom(p.getNom())
@@ -140,6 +164,9 @@ public class PersonneService {
                 .email(p.getEmail())
                 .date(p.getDate())
                 .role(p.getRole())
+                .idTypePersonne(type != null ? type.getIdTypePersonne() : null)
+                .codeTypePersonne(type != null ? type.getCode() : null)
+                .libelleTypePersonne(type != null ? type.getLibelle() : null)
                 .build();
     }
 }

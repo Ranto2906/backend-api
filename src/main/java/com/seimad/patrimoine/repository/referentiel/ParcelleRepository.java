@@ -5,10 +5,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface ParcelleRepository extends JpaRepository<Parcelle, UUID> {
 
     List<Parcelle> findByTitreFoncierIdTitreFoncier(UUID idTitreFoncier);
+
+    Optional<Parcelle> findByNumeroLotAndTitreFoncierIdTitreFoncier(String numeroLot, UUID idTitreFoncier);
 }

@@ -34,6 +34,9 @@ public class Photo {
     @Column(name = "type_photo", length = 50)
     private String typePhoto;
 
+    @Column(name = "observation", columnDefinition = "TEXT")
+    private String observation;
+
     @Column(name = "chemin_fichier", columnDefinition = "TEXT")
     private String cheminFichier;
 

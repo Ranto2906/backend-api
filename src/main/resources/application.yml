@@ -7,7 +7,7 @@ spring:
 
   # ── Datasource PostgreSQL ──
   datasource:
-    url: jdbc:postgresql://localhost:5432/gestionpatrimoine
+    url: jdbc:postgresql://localhost:5432/patrimoine
     username: postgres
     password: r
     driver-class-name: org.postgresql.Driver
@@ -42,11 +42,21 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+  # ── Upload de fichiers (import Excel) ──
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 60MB
+
   # ── Sécurité ──
   security:
     user:
       name: admin
       password: admin123
+
+# ── Stockage des fichiers (photos importées) ──
+app:
+  stockage-photos: uploads/photos
 
 # ── JWT ──
 jwt:
@@ -57,7 +67,7 @@ jwt:
 
 # ── Serveur ──
 server:
-  port: 8090
+  port: 8092
 
 # ── Actuator ──
 management:

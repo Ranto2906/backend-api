@@ -1,7 +1,9 @@
 package com.seimad.patrimoine.controller.notification;
 
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.notification.NotificationOccupationDTO;
 import com.seimad.patrimoine.dto.notification.NotificationOccupationRequest;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import com.seimad.patrimoine.service.notification.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +27,7 @@ import java.util.UUID;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final AuditService auditService;
 
     @GetMapping
     @Operation(summary = "Lister les notifications (pagination)")
@@ -66,6 +69,19 @@ public class NotificationController {
     public ResponseEntity<Void> supprimer(@PathVariable UUID id) {
         notificationService.supprimer(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/historique")
+    @Operation(summary = "Historique des modifications d'une notification")
+    public ResponseEntity<List<AuditDTO>> historique(@PathVariable UUID id) {
+        return ResponseEntity.ok(auditService.historiqueEntite("notification_occupation", id.toString()));
+    }
+
+    @GetMapping("/{id}/derniere-modification")
+    @Operation(summary = "Dernière modification d'une notification (anciennes valeurs)")
+    public ResponseEntity<AuditDTO> derniereModification(@PathVariable UUID id) {
+        AuditDTO audit = auditService.derniereModification("notification_occupation", id.toString());
+        return audit != null ? ResponseEntity.ok(audit) : ResponseEntity.noContent().build();
     }
 
     // ── Recherches par critère ──

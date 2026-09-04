@@ -1,6 +1,7 @@
 package com.seimad.patrimoine.entity.dossier;
 
 import com.seimad.patrimoine.entity.auth.Utilisateur;
+import com.seimad.patrimoine.entity.notification.Personne;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -42,6 +43,6 @@ public class DocumentDemandeur {
     private Utilisateur utilisateur;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_demandeur", nullable = false)
-    private Demandeur demandeur;
+    @JoinColumn(name = "id_personne", nullable = false)
+    private Personne personne;
 }

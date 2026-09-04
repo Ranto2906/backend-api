@@ -11,6 +11,7 @@ import com.seimad.patrimoine.repository.notification.NotificationPersonneReposit
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
 import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,7 @@ public class NotificationService {
     private final PersonneRepository personneRepository;
     private final ParcelleRepository parcelleRepository;
     private final TitreFoncierRepository titreFoncierRepository;
+    private final AuditService auditService;
 
     // ── CRUD ──
 
@@ -92,6 +94,15 @@ public class NotificationService {
             notificationPersonneRepository.saveAll(personnes);
         }
 
+        // ── Enregistrer l'audit de création ──
+        auditService.enregistrer(
+                "notification_occupation",
+                notification.getIdNotification().toString(),
+                "CREATE",
+                null,
+                valeursAudit(notification)
+        );
+
         return toDTO(notification);
     }
 
@@ -99,6 +110,9 @@ public class NotificationService {
     public NotificationOccupationDTO mettreAJour(UUID id, NotificationOccupationRequest request) {
         NotificationOccupation notification = notificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Notification non trouvée avec l'id : " + id));
+
+        // ── Anciennes valeurs AVANT modification ──
+        Map<String, Object> anciennesValeurs = valeursAudit(notification);
 
         TitreFoncier titreFoncier = titreFoncierRepository.findById(request.getIdTitreFoncier())
                 .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé"));
@@ -136,12 +150,39 @@ public class NotificationService {
             notificationPersonneRepository.saveAll(personnes);
         }
 
-        return toDTO(notificationRepository.save(notification));
+        NotificationOccupation saved = notificationRepository.save(notification);
+
+        // ── Enregistrer l'audit de modification ──
+        auditService.enregistrer(
+                "notification_occupation",
+                id.toString(),
+                "UPDATE",
+                anciennesValeurs,
+                valeursAudit(saved)
+        );
+
+        return toDTO(saved);
     }
 
     @Transactional
     public void supprimer(UUID id) {
+        NotificationOccupation notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification non trouvée avec l'id : " + id));
+
+        // ── Anciennes valeurs AVANT suppression ──
+        Map<String, Object> anciennesValeurs = valeursAudit(notification);
+
         notificationPersonneRepository.deleteByIdNotification(id);
+
+        // ── Enregistrer l'audit de suppression ──
+        auditService.enregistrer(
+                "notification_occupation",
+                id.toString(),
+                "DELETE",
+                anciennesValeurs,
+                null
+        );
+
         notificationRepository.deleteById(id);
     }
 
@@ -188,6 +229,35 @@ public class NotificationService {
     }
 
     // ── Helpers ──
+
+    /**
+     * Construit la carte des valeurs (audit) d'une notification :
+     * champs métier + libellés lisibles (n° titre, n° lot, personnes liées).
+     */
+    private Map<String, Object> valeursAudit(NotificationOccupation n) {
+        Map<String, Object> valeurs = new LinkedHashMap<>();
+        valeurs.put("dateNotification", n.getDateNotification());
+        valeurs.put("annee", n.getAnnee());
+        valeurs.put("dateConvocation", n.getDateConvocation());
+        valeurs.put("informationsOccupants", n.getInformationsOccupants());
+        valeurs.put("constats", n.getConstats());
+        valeurs.put("doleances", n.getDoleances());
+        valeurs.put("actionsEntreprises", n.getActionsEntreprises());
+        valeurs.put("statut", n.getStatut());
+        valeurs.put("numeroTitre", n.getTitreFoncier() != null ? n.getTitreFoncier().getNumero() : null);
+        valeurs.put("numeroLot", n.getParcelle() != null ? n.getParcelle().getNumeroLot() : null);
+
+        String personnes = notificationPersonneRepository.findByIdNotification(n.getIdNotification()).stream()
+                .map(np -> {
+                    String nom = np.getPersonne() != null ? np.getPersonne().getNom() : null;
+                    String role = np.getRoleDansNotification();
+                    if (nom == null) return role != null && !role.isBlank() ? role : "?";
+                    return role != null && !role.isBlank() ? nom + " (" + role + ")" : nom;
+                })
+                .collect(Collectors.joining(", "));
+        valeurs.put("personnes", personnes.isEmpty() ? null : personnes);
+        return valeurs;
+    }
 
     private NotificationOccupationDTO toDTO(NotificationOccupation n) {
         List<NotificationPersonne> personnes = notificationPersonneRepository

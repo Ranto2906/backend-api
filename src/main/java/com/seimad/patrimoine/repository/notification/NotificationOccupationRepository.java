@@ -30,6 +30,14 @@ public interface NotificationOccupationRepository extends JpaRepository<Notifica
            "LOWER(n.doleances) LIKE LOWER(CONCAT('%',:search,'%')))")
     Page<NotificationOccupation> search(@Param("search") String search, Pageable pageable);
 
+    /** Doublons d'import potentiels : même titre foncier, même parcelle, même date de notification. */
+    @Query("SELECT n FROM NotificationOccupation n WHERE n.titreFoncier.idTitreFoncier = :tf " +
+           "AND n.dateNotification = :date AND " +
+           "((:parc IS NULL AND n.parcelle IS NULL) OR (:parc IS NOT NULL AND n.parcelle.idParcelle = :parc))")
+    List<NotificationOccupation> trouverDoublons(@Param("tf") UUID idTitreFoncier,
+                                                 @Param("parc") UUID idParcelle,
+                                                 @Param("date") LocalDate dateNotification);
+
     long countByStatut(String statut);
     long countByAnnee(Integer annee);
 }

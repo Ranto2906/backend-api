@@ -18,4 +18,8 @@ public class PersonneDTO {
     private String email;
     private LocalDateTime date;
     private String role;
+    // Type personne (référentiel)
+    private Integer idTypePersonne;
+    private String codeTypePersonne;
+    private String libelleTypePersonne;
 }

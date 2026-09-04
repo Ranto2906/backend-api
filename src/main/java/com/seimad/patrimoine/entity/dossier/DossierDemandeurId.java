@@ -11,5 +11,5 @@ import java.io.Serializable;
 public class DossierDemandeurId implements Serializable {
 
     private Integer idDossier;
-    private Integer idDemandeur;
+    private Integer idPersonne;
 }

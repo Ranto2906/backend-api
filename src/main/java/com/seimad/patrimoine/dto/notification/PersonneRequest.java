@@ -18,4 +18,5 @@ public class PersonneRequest {
     private String adresse;
     private String role;
     private String email;
+    private Integer idTypePersonne;
 }
