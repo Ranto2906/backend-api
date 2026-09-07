@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.dto.signalement;
 
+import com.seimad.patrimoine.dto.carte.GeometrieRequest;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,16 +30,20 @@ public class SignalementRequest {
 
     private Integer idVille;
 
+    /** Géométrie GPS du constat (optionnelle) — stockée dans la table `geometrie`.
+     *  Reçue du mobile en GeoJSON (ex. {"type":"Point","coordinates":[lng,lat]}). */
+    private GeometrieRequest geometrie;
+
     private UUID idTitreFoncier;
 
     private UUID idParcelle;
 
     private Integer idDossier;
 
-    private UUID idNotification;
-
-    private UUID idAvertissement;
-
-    /** Optionnel : défaut = utilisateur connecté (ou null si appel non authentifié). */
+    /**
+     * Optionnel : défaut = utilisateur connecté (ou null si appel non authentifié).
+     * NB : le rattachement à une notification / un avertissement se fait désormais
+     * via l'assignation (POST /signalements/{id}/assignations/...).
+     */
     private Integer idUtilisateurCreation;
 }

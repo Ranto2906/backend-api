@@ -1,5 +1,7 @@
 package com.seimad.patrimoine.service.signalement;
 
+import com.seimad.patrimoine.dto.carte.GeometrieRequest;
+import com.seimad.patrimoine.dto.signalement.AssignationDTO;
 import com.seimad.patrimoine.dto.signalement.SignalementDTO;
 import com.seimad.patrimoine.dto.signalement.SignalementRequest;
 import com.seimad.patrimoine.dto.signalement.SignalementTraitementRequest;
@@ -12,15 +14,18 @@ import com.seimad.patrimoine.entity.notification.NotificationOccupation;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
 import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
 import com.seimad.patrimoine.entity.referentiel.Ville;
+import com.seimad.patrimoine.entity.signalement.Assignation;
 import com.seimad.patrimoine.entity.signalement.Signalement;
 import com.seimad.patrimoine.entity.signalement.StatutSignalement;
 import com.seimad.patrimoine.entity.signalement.TypeSignalement;
 import com.seimad.patrimoine.repository.auth.UtilisateurRepository;
+import com.seimad.patrimoine.repository.carte.GeometrieRepository;
 import com.seimad.patrimoine.repository.notification.AvertissementRepository;
 import com.seimad.patrimoine.repository.notification.NotificationOccupationRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
 import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
 import com.seimad.patrimoine.repository.referentiel.VilleRepository;
+import com.seimad.patrimoine.repository.signalement.AssignationRepository;
 import com.seimad.patrimoine.repository.signalement.SignalementRepository;
 import com.seimad.patrimoine.repository.signalement.StatutSignalementRepository;
 import com.seimad.patrimoine.repository.signalement.TypeSignalementRepository;
@@ -36,6 +41,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -50,6 +56,8 @@ import java.util.stream.Collectors;
 public class SignalementService {
 
     private final SignalementRepository signalementRepository;
+    private final GeometrieRepository geometrieRepository;
+    private final AssignationRepository assignationRepository;
     private final TypeSignalementRepository typeSignalementRepository;
     private final StatutSignalementRepository statutSignalementRepository;
     private final VilleRepository villeRepository;
@@ -125,8 +133,6 @@ public class SignalementService {
                 .titreFoncier(resoudreTitreFoncier(request.getIdTitreFoncier()))
                 .parcelle(resoudreParcelle(request.getIdParcelle()))
                 .dossier(resoudreDossier(request.getIdDossier()))
-                .notificationOccupation(resoudreNotification(request.getIdNotification()))
-                .avertissement(resoudreAvertissement(request.getIdAvertissement()))
                 .utilisateurCreation(resoudreUtilisateur(request.getIdUtilisateurCreation()))
                 .build();
         if (request.getIdStatutSignalement() != null) {
@@ -136,6 +142,12 @@ public class SignalementService {
         signalement.setDateModification(LocalDateTime.now());
 
         Signalement saved = signalementRepository.save(signalement);
+
+        // Position GPS du constat → table `geometrie` (PostGIS), entite_type='signalement'.
+        if (request.getGeometrie() != null) {
+            enregistrerGeometrie(request.getGeometrie(), saved.getIdSignalement(),
+                    saved.getUtilisateurCreation());
+        }
 
         auditService.enregistrer("signalement", saved.getIdSignalement().toString(), "CREATE",
                 null, valeursAudit(saved));
@@ -168,14 +180,17 @@ public class SignalementService {
         signalement.setTitreFoncier(resoudreTitreFoncier(request.getIdTitreFoncier()));
         signalement.setParcelle(resoudreParcelle(request.getIdParcelle()));
         signalement.setDossier(resoudreDossier(request.getIdDossier()));
-        signalement.setNotificationOccupation(resoudreNotification(request.getIdNotification()));
-        signalement.setAvertissement(resoudreAvertissement(request.getIdAvertissement()));
         if (request.getIdUtilisateurCreation() != null) {
             signalement.setUtilisateurCreation(resoudreUtilisateur(request.getIdUtilisateurCreation()));
         }
         signalement.setDateModification(LocalDateTime.now());
 
         Signalement saved = signalementRepository.save(signalement);
+
+        // Géométrie fournie à la mise à jour (ex. repositionnement) → upsert PostGIS.
+        if (request.getGeometrie() != null) {
+            enregistrerGeometrie(request.getGeometrie(), id, saved.getUtilisateurCreation());
+        }
 
         auditService.enregistrer("signalement", id.toString(), "UPDATE",
                 anciennesValeurs, valeursAudit(saved));
@@ -219,6 +234,95 @@ public class SignalementService {
         Map<String, Object> anciennesValeurs = valeursAudit(signalement);
         auditService.enregistrer("signalement", id.toString(), "DELETE", anciennesValeurs, null);
         signalementRepository.deleteById(id);
+        geometrieRepository.supprimerParEntite("signalement", id);
+    }
+
+    // ── Assignations (signalement <-> notification / avertissement) ──
+
+    @Transactional(readOnly = true)
+    public List<AssignationDTO> listerAssignations(UUID idSignalement) {
+        Signalement signalement = trouverEntite(idSignalement);
+        return assignationRepository
+                .findBySignalementIdSignalementOrderByDateAssignationDesc(signalement.getIdSignalement())
+                .stream().map(this::toAssignationDTO).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public AssignationDTO assignerNotification(UUID idSignalement, UUID idNotification) {
+        Signalement signalement = trouverEntite(idSignalement);
+        NotificationOccupation notification = notificationOccupationRepository.findById(idNotification)
+                .orElseThrow(() -> new RuntimeException("Notification non trouvée avec l'id : " + idNotification));
+        // Idempotent : une assignation existante est renvoyée telle quelle
+        var existante = assignationRepository
+                .findBySignalementIdSignalementAndNotificationIdNotification(idSignalement, idNotification);
+        if (existante.isPresent()) {
+            return toAssignationDTO(existante.get());
+        }
+        Assignation assignation = Assignation.builder()
+                .signalement(signalement)
+                .notification(notification)
+                .utilisateur(resoudreUtilisateur(null))
+                .build();
+        Assignation saved = assignationRepository.save(assignation);
+        auditService.enregistrer("assignation", saved.getIdAssignation().toString(), "CREATE",
+                null, valeursAuditAssignation(saved));
+        return toAssignationDTO(saved);
+    }
+
+    @Transactional
+    public AssignationDTO assignerAvertissement(UUID idSignalement, UUID idAvertissement) {
+        Signalement signalement = trouverEntite(idSignalement);
+        Avertissement avertissement = avertissementRepository.findById(idAvertissement)
+                .orElseThrow(() -> new RuntimeException("Avertissement non trouvé avec l'id : " + idAvertissement));
+        // Idempotent : une assignation existante est renvoyée telle quelle
+        var existante = assignationRepository
+                .findBySignalementIdSignalementAndAvertissementIdAvertissement(idSignalement, idAvertissement);
+        if (existante.isPresent()) {
+            return toAssignationDTO(existante.get());
+        }
+        Assignation assignation = Assignation.builder()
+                .signalement(signalement)
+                .avertissement(avertissement)
+                .utilisateur(resoudreUtilisateur(null))
+                .build();
+        Assignation saved = assignationRepository.save(assignation);
+        auditService.enregistrer("assignation", saved.getIdAssignation().toString(), "CREATE",
+                null, valeursAuditAssignation(saved));
+        return toAssignationDTO(saved);
+    }
+
+    @Transactional
+    public void desassignerNotification(UUID idSignalement, UUID idNotification) {
+        Assignation assignation = assignationRepository
+                .findBySignalementIdSignalementAndNotificationIdNotification(idSignalement, idNotification)
+                .orElseThrow(() -> new RuntimeException("Aucune assignation entre ce signalement et cette notification"));
+        Map<String, Object> anciennesValeurs = valeursAuditAssignation(assignation);
+        auditService.enregistrer("assignation", assignation.getIdAssignation().toString(), "DELETE",
+                anciennesValeurs, null);
+        assignationRepository.delete(assignation);
+    }
+
+    @Transactional
+    public void desassignerAvertissement(UUID idSignalement, UUID idAvertissement) {
+        Assignation assignation = assignationRepository
+                .findBySignalementIdSignalementAndAvertissementIdAvertissement(idSignalement, idAvertissement)
+                .orElseThrow(() -> new RuntimeException("Aucune assignation entre ce signalement et cet avertissement"));
+        Map<String, Object> anciennesValeurs = valeursAuditAssignation(assignation);
+        auditService.enregistrer("assignation", assignation.getIdAssignation().toString(), "DELETE",
+                anciennesValeurs, null);
+        assignationRepository.delete(assignation);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AssignationDTO> listerAssignationsParNotification(UUID idNotification) {
+        return assignationRepository.findByNotificationIdNotification(idNotification).stream()
+                .map(this::toAssignationDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AssignationDTO> listerAssignationsParAvertissement(UUID idAvertissement) {
+        return assignationRepository.findByAvertissementIdAvertissement(idAvertissement).stream()
+                .map(this::toAssignationDTO).collect(Collectors.toList());
     }
 
     // ── Filtres ──
@@ -310,14 +414,9 @@ public class SignalementService {
         return idDossier != null ? entityManager.getReference(Dossier.class, idDossier) : null;
     }
 
-    private NotificationOccupation resoudreNotification(UUID id) {
-        return id != null ? notificationOccupationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Notification non trouvée avec l'id : " + id)) : null;
-    }
-
-    private Avertissement resoudreAvertissement(UUID id) {
-        return id != null ? avertissementRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Avertissement non trouvé avec l'id : " + id)) : null;
+    private Signalement trouverEntite(UUID id) {
+        return signalementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Signalement non trouvé avec l'id : " + id));
     }
 
     private Utilisateur resoudreUtilisateur(Integer idUtilisateur) {
@@ -329,6 +428,29 @@ public class SignalementService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || "anonymousUser".equals(auth.getPrincipal())) return null;
         return utilisateurRepository.findByNomUtilisateur(auth.getName()).orElse(null);
+    }
+
+    /**
+     * Persiste la géométrie du signalement (reçue en GeoJSON texte) dans la
+     * table `geometrie` (PostGIS). Ignorée si absente ou si l'utilisateur
+     * n'est pas résolu (colonne id_utilisateur NOT NULL côté base).
+     */
+    private void enregistrerGeometrie(GeometrieRequest geometrie, UUID idSignalement, Utilisateur utilisateur) {
+        if (geometrie == null || geometrie.getGeojson() == null || geometrie.getGeojson().isBlank()) {
+            return;
+        }
+        if (utilisateur == null) {
+            log.warn("Géométrie ignorée pour le signalement {} : utilisateur non résolu", idSignalement);
+            return;
+        }
+        String type = geometrie.getTypeGeometrie() != null ? geometrie.getTypeGeometrie() : "Point";
+        String source = geometrie.getSource() != null && !geometrie.getSource().isBlank()
+                ? geometrie.getSource() : "Point carte";
+        BigDecimal precisionM = geometrie.getPrecisionM() != null
+                ? BigDecimal.valueOf(geometrie.getPrecisionM()) : null;
+        geometrieRepository.upsert("signalement", idSignalement, type, geometrie.getGeojson(),
+                precisionM, source, utilisateur.getIdUtilisateur());
+        log.info("Géométrie {} enregistrée pour le signalement {}", type, idSignalement);
     }
 
     /** Valeurs métier lisibles pour l'audit d'un signalement. */
@@ -347,6 +469,43 @@ public class SignalementService {
         valeurs.put("utilisateurTraitement",
                 s.getUtilisateurTraitement() != null ? s.getUtilisateurTraitement().getNomComplet() : null);
         return valeurs;
+    }
+
+    /** Valeurs lisibles pour l'audit d'une assignation. */
+    private Map<String, Object> valeursAuditAssignation(Assignation a) {
+        Map<String, Object> valeurs = new LinkedHashMap<>();
+        valeurs.put("signalement", a.getSignalement() != null ? a.getSignalement().getReference() : null);
+        valeurs.put("typeCible", a.getNotification() != null ? "notification"
+                : a.getAvertissement() != null ? "avertissement" : null);
+        valeurs.put("notification", a.getNotification() != null ? a.getNotification().getIdNotification().toString() : null);
+        valeurs.put("avertissement", a.getAvertissement() != null ? a.getAvertissement().getIdAvertissement().toString() : null);
+        valeurs.put("dateAssignation", a.getDateAssignation());
+        return valeurs;
+    }
+
+    private AssignationDTO toAssignationDTO(Assignation a) {
+        AssignationDTO.AssignationDTOBuilder b = AssignationDTO.builder()
+                .idAssignation(a.getIdAssignation())
+                .idSignalement(a.getSignalement() != null ? a.getSignalement().getIdSignalement() : null)
+                .referenceSignalement(a.getSignalement() != null ? a.getSignalement().getReference() : null)
+                .dateAssignation(a.getDateAssignation())
+                .idUtilisateur(a.getUtilisateur() != null ? a.getUtilisateur().getIdUtilisateur() : null)
+                .nomUtilisateur(a.getUtilisateur() != null ? a.getUtilisateur().getNomComplet() : null);
+        if (a.getNotification() != null) {
+            b.typeCible("notification")
+                    .idNotification(a.getNotification().getIdNotification())
+                    .dateNotification(a.getNotification().getDateNotification())
+                    .numeroTitreNotification(a.getNotification().getTitreFoncier() != null
+                            ? a.getNotification().getTitreFoncier().getNumero() : null);
+        }
+        if (a.getAvertissement() != null) {
+            b.typeCible("avertissement")
+                    .idAvertissement(a.getAvertissement().getIdAvertissement())
+                    .dateAvertissement(a.getAvertissement().getDateAvertissement())
+                    .numeroTitreAvertissement(a.getAvertissement().getTitreFoncier() != null
+                            ? a.getAvertissement().getTitreFoncier().getNumero() : null);
+        }
+        return b.build();
     }
 
     private SignalementDTO toDTO(Signalement s) {
@@ -377,8 +536,9 @@ public class SignalementService {
                 .nomUtilisateurTraitement(s.getUtilisateurTraitement() != null ? s.getUtilisateurTraitement().getNomComplet() : null)
                 .idDossier(s.getDossier() != null ? s.getDossier().getIdDossier() : null)
                 .numeroDossier(s.getDossier() != null ? s.getDossier().getNumeroDossier() : null)
-                .idNotification(s.getNotificationOccupation() != null ? s.getNotificationOccupation().getIdNotification() : null)
-                .idAvertissement(s.getAvertissement() != null ? s.getAvertissement().getIdAvertissement() : null)
+                .assignations(assignationRepository
+                        .findBySignalementIdSignalementOrderByDateAssignationDesc(s.getIdSignalement())
+                        .stream().map(this::toAssignationDTO).collect(Collectors.toList()))
                 .idUtilisateurCreation(s.getUtilisateurCreation() != null ? s.getUtilisateurCreation().getIdUtilisateur() : null)
                 .nomUtilisateurCreation(s.getUtilisateurCreation() != null ? s.getUtilisateurCreation().getNomComplet() : null)
                 .build();

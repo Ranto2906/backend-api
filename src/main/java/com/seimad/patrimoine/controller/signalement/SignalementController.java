@@ -1,6 +1,7 @@
 package com.seimad.patrimoine.controller.signalement;
 
 import com.seimad.patrimoine.dto.dossier.AuditDTO;
+import com.seimad.patrimoine.dto.signalement.AssignationDTO;
 import com.seimad.patrimoine.dto.signalement.SignalementDTO;
 import com.seimad.patrimoine.dto.signalement.SignalementRequest;
 import com.seimad.patrimoine.dto.signalement.SignalementTraitementRequest;
@@ -95,6 +96,60 @@ public class SignalementController {
     public ResponseEntity<Void> supprimer(@PathVariable UUID id) {
         signalementService.supprimer(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Assignations (signalement <-> notification / avertissement) ──
+
+    @GetMapping("/{id}/assignations")
+    @Operation(summary = "Assignations d'un signalement (notifications / avertissements)")
+    public ResponseEntity<List<AssignationDTO>> listerAssignations(@PathVariable UUID id) {
+        return ResponseEntity.ok(signalementService.listerAssignations(id));
+    }
+
+    @PostMapping("/{id}/assignations/notification/{idNotification}")
+    @Operation(summary = "Assigner un signalement à une notification d'occupation (idempotent)")
+    public ResponseEntity<AssignationDTO> assignerNotification(
+            @PathVariable UUID id,
+            @PathVariable UUID idNotification) {
+        return ResponseEntity.ok(signalementService.assignerNotification(id, idNotification));
+    }
+
+    @DeleteMapping("/{id}/assignations/notification/{idNotification}")
+    @Operation(summary = "Retirer l'assignation d'un signalement à une notification")
+    public ResponseEntity<Void> desassignerNotification(
+            @PathVariable UUID id,
+            @PathVariable UUID idNotification) {
+        signalementService.desassignerNotification(id, idNotification);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/assignations/avertissement/{idAvertissement}")
+    @Operation(summary = "Assigner un signalement à un avertissement (idempotent)")
+    public ResponseEntity<AssignationDTO> assignerAvertissement(
+            @PathVariable UUID id,
+            @PathVariable UUID idAvertissement) {
+        return ResponseEntity.ok(signalementService.assignerAvertissement(id, idAvertissement));
+    }
+
+    @DeleteMapping("/{id}/assignations/avertissement/{idAvertissement}")
+    @Operation(summary = "Retirer l'assignation d'un signalement à un avertissement")
+    public ResponseEntity<Void> desassignerAvertissement(
+            @PathVariable UUID id,
+            @PathVariable UUID idAvertissement) {
+        signalementService.desassignerAvertissement(id, idAvertissement);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/assignations/par-notification/{idNotification}")
+    @Operation(summary = "Assignations rattachées à une notification d'occupation")
+    public ResponseEntity<List<AssignationDTO>> listerAssignationsParNotification(@PathVariable UUID idNotification) {
+        return ResponseEntity.ok(signalementService.listerAssignationsParNotification(idNotification));
+    }
+
+    @GetMapping("/assignations/par-avertissement/{idAvertissement}")
+    @Operation(summary = "Assignations rattachées à un avertissement")
+    public ResponseEntity<List<AssignationDTO>> listerAssignationsParAvertissement(@PathVariable UUID idAvertissement) {
+        return ResponseEntity.ok(signalementService.listerAssignationsParAvertissement(idAvertissement));
     }
 
     // ── Historique ──

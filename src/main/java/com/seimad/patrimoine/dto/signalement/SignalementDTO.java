@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -35,6 +36,8 @@ public class SignalementDTO {
     // Localisation
     private Integer idVille;
     private String nomVille;
+
+    // Rattachements possibles
     private UUID idTitreFoncier;
     private String numeroTitre;
     private UUID idParcelle;
@@ -49,8 +52,9 @@ public class SignalementDTO {
     // Rattachés possibles
     private Integer idDossier;
     private String numeroDossier;
-    private UUID idNotification;
-    private UUID idAvertissement;
+
+    // Assignations (signalement <-> notification / avertissement)
+    private List<AssignationDTO> assignations;
 
     // Créateur
     private Integer idUtilisateurCreation;

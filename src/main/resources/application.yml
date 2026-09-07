@@ -35,6 +35,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
+    repair-on-migrate: true
 
   # ── Jackson ──
   jackson:
@@ -67,7 +68,7 @@ jwt:
 
 # ── Serveur ──
 server:
-  port: 8092
+  port: 8093
 
 # ── Actuator ──
 management:

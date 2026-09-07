@@ -14,16 +14,27 @@ import java.util.UUID;
 @Repository
 public interface SignalementRepository extends JpaRepository<Signalement, UUID> {
 
-    @Query("SELECT s FROM Signalement s WHERE " +
-           "(:search IS NULL OR :search = '' OR " +
+    /**
+     * Recherche multi-critères (référence, description, type, statut, ville,
+     * n° titre, n° lot, créateur). LEFT JOIN explicites : les relations
+     * optionnelles (ville, titre, parcelle) ne doivent pas exclure la ligne.
+     */
+    @Query("SELECT s FROM Signalement s " +
+           "LEFT JOIN s.typeSignalement ts " +
+           "LEFT JOIN s.statutSignalement st " +
+           "LEFT JOIN s.ville ville " +
+           "LEFT JOIN s.titreFoncier tf " +
+           "LEFT JOIN s.parcelle parc " +
+           "LEFT JOIN s.utilisateurCreation uc " +
+           "WHERE (:search IS NULL OR :search = '' OR " +
            "LOWER(s.reference) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
            "LOWER(s.description) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(CAST(s.typeSignalement.libelle AS string)) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(CAST(s.statutSignalement.libelle AS string)) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(CAST(s.ville.nomVille AS string)) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(CAST(s.titreFoncier.numero AS string)) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(CAST(s.parcelle.numeroLot AS string)) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(CAST(s.utilisateurCreation.nomComplet AS string)) LIKE LOWER(CONCAT('%',:search,'%')))")
+           "LOWER(ts.libelle) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(st.libelle) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(ville.nomVille) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(tf.numero) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(parc.numeroLot) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(uc.nomComplet) LIKE LOWER(CONCAT('%',:search,'%')))")
     Page<Signalement> search(@Param("search") String search, Pageable pageable);
 
     List<Signalement> findByVilleIdVille(Integer idVille);

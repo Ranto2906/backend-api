@@ -2,8 +2,6 @@ package com.seimad.patrimoine.entity.signalement;
 
 import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.dossier.Dossier;
-import com.seimad.patrimoine.entity.notification.Avertissement;
-import com.seimad.patrimoine.entity.notification.NotificationOccupation;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
 import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
 import com.seimad.patrimoine.entity.referentiel.Ville;
@@ -78,14 +76,6 @@ public class Signalement {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_dossier")
     private Dossier dossier;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_notification")
-    private NotificationOccupation notificationOccupation;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_avertissement")
-    private Avertissement avertissement;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_utilisateur_creation", nullable = false)
