@@ -1,7 +1,7 @@
 package com.seimad.patrimoine.entity.dossier;
 
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
+import com.seimad.patrimoine.entity.referentiel.Propriete;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -15,7 +15,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "dossier_parcelle", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"id_dossier", "id_titre_foncier", "id_parcelle"})
+        @UniqueConstraint(columnNames = {"id_dossier", "id_propriete", "id_parcelle"})
 })
 @Getter
 @Setter
@@ -33,8 +33,8 @@ public class DossierParcelle {
     private Dossier dossier;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_titre_foncier", nullable = false)
-    private TitreFoncier titreFoncier;
+    @JoinColumn(name = "id_propriete", nullable = false)
+    private Propriete propriete;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_parcelle")

@@ -19,7 +19,7 @@ public interface NotificationOccupationRepository extends JpaRepository<Notifica
 
     List<NotificationOccupation> findByAnnee(Integer annee);
 
-    List<NotificationOccupation> findByTitreFoncierIdTitreFoncier(UUID idTitreFoncier);
+       List<NotificationOccupation> findByProprieteIdPropriete(Integer idPropriete);
 
     List<NotificationOccupation> findByParcelleIdParcelle(UUID idParcelle);
 
@@ -31,10 +31,10 @@ public interface NotificationOccupationRepository extends JpaRepository<Notifica
     Page<NotificationOccupation> search(@Param("search") String search, Pageable pageable);
 
     /** Doublons d'import potentiels : même titre foncier, même parcelle, même date de notification. */
-    @Query("SELECT n FROM NotificationOccupation n WHERE n.titreFoncier.idTitreFoncier = :tf " +
+    @Query("SELECT n FROM NotificationOccupation n WHERE n.propriete.idPropriete = :tf " +
            "AND n.dateNotification = :date AND " +
            "((:parc IS NULL AND n.parcelle IS NULL) OR (:parc IS NOT NULL AND n.parcelle.idParcelle = :parc))")
-    List<NotificationOccupation> trouverDoublons(@Param("tf") UUID idTitreFoncier,
+       List<NotificationOccupation> trouverDoublons(@Param("tf") Integer idPropriete,
                                                  @Param("parc") UUID idParcelle,
                                                  @Param("date") LocalDate dateNotification);
 

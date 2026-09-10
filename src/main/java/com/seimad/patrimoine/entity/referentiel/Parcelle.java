@@ -14,7 +14,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "parcelle", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"numero_lot", "id_titre_foncier"})
+        @UniqueConstraint(columnNames = {"numero_lot", "id_propriete"})
 })
 @Getter
 @Setter
@@ -49,6 +49,6 @@ public class Parcelle {
     private Utilisateur utilisateurCreation;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_titre_foncier", nullable = false)
-    private TitreFoncier titreFoncier;
+    @JoinColumn(name = "id_propriete", nullable = false)
+    private Propriete propriete;
 }

@@ -153,7 +153,7 @@ public class SuiviNotificationService {
 
         NotificationOccupation n = s.getNotificationOccupation();
         if (n != null) {
-            valeurs.put("numeroTitre", n.getTitreFoncier() != null ? n.getTitreFoncier().getNumero() : null);
+            valeurs.put("numeroPropriete", n.getPropriete() != null ? n.getPropriete().getNumero() : null);
             valeurs.put("numeroLot", n.getParcelle() != null ? n.getParcelle().getNumeroLot() : null);
             valeurs.put("dateNotification", n.getDateNotification());
             valeurs.put("statut", n.getStatut());
@@ -172,7 +172,7 @@ public class SuiviNotificationService {
         NotificationOccupation n = s.getNotificationOccupation();
         if (n != null) {
             b.idNotification(n.getIdNotification())
-             .numeroTitre(n.getTitreFoncier() != null ? n.getTitreFoncier().getNumero() : null)
+             .numeroPropriete(n.getPropriete() != null ? n.getPropriete().getNumero() : null)
              .numeroLot(n.getParcelle() != null ? n.getParcelle().getNumeroLot() : null)
              .dateNotification(n.getDateNotification())
              .statut(n.getStatut());

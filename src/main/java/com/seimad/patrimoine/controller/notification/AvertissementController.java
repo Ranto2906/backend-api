@@ -97,11 +97,11 @@ public class AvertissementController {
         return ResponseEntity.ok(avertissementService.listerParAnnee(annee));
     }
 
-    @GetMapping("/titre-foncier/{idTitreFoncier}")
+    @GetMapping("/propriete/{idPropriete}")
     @Operation(summary = "Lister les avertissements par titre foncier")
-    public ResponseEntity<List<AvertissementDTO>> listerParTitreFoncier(
-            @PathVariable UUID idTitreFoncier) {
-        return ResponseEntity.ok(avertissementService.listerParTitreFoncier(idTitreFoncier));
+    public ResponseEntity<List<AvertissementDTO>> listerParPropriete(
+            @PathVariable Integer idPropriete) {
+        return ResponseEntity.ok(avertissementService.listerParPropriete(idPropriete));
     }
 
     @GetMapping("/parcelle/{idParcelle}")

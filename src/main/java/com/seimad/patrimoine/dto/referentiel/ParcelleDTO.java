@@ -16,8 +16,8 @@ public class ParcelleDTO {
     private String numeroLot;
     private BigDecimal superficieM2;
     private String observation;
-    private String idTitreFoncier;
-    private String numeroTitreFoncier;
+    private Integer idPropriete;
+    private String numeroPropriete;
     private String createdAt;
     private String updatedAt;
 }

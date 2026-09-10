@@ -20,7 +20,7 @@ public class SuiviNotificationDTO {
     private String actionsASuivre;
     private UUID idNotification;
     // Contexte de la notification (pour affichage dans les listes)
-    private String numeroTitre;
+    private String numeroPropriete;
     private String numeroLot;
     private LocalDate dateNotification;
     private String statut;

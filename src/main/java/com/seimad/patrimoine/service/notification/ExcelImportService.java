@@ -8,7 +8,6 @@ import com.seimad.patrimoine.entity.notification.Photo;
 import com.seimad.patrimoine.entity.notification.SuiviNotification;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
 import com.seimad.patrimoine.entity.referentiel.Propriete;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
 import com.seimad.patrimoine.repository.notification.AvertissementRepository;
 import com.seimad.patrimoine.repository.notification.NotificationOccupationRepository;
 import com.seimad.patrimoine.repository.notification.NotificationPersonneRepository;
@@ -18,7 +17,6 @@ import com.seimad.patrimoine.repository.notification.SuiviNotificationRepository
 import com.seimad.patrimoine.repository.notification.TypePersonneRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
 import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
-import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -90,7 +88,6 @@ public class ExcelImportService {
     private final TypePersonneRepository typePersonneRepository;
     private final PhotoRepository photoRepository;
     private final ProprieteRepository proprieteRepository;
-    private final TitreFoncierRepository titreFoncierRepository;
     private final ParcelleRepository parcelleRepository;
 
     @Value("${app.stockage-photos:uploads/photos}")
@@ -174,7 +171,7 @@ public class ExcelImportService {
 
         // Cache des référentiels/personnes déjà créés ou trouvés pendant l'import
         Map<String, Propriete> proprietes = new HashMap<>();
-        Map<String, TitreFoncier> titres = new HashMap<>();
+        Map<String, Propriete> titres = new HashMap<>();
         Map<String, Parcelle> parcelles = new HashMap<>();
         Map<String, Personne> personnes = new HashMap<>();
 
@@ -198,7 +195,7 @@ public class ExcelImportService {
 
     private void importerNotifications(Sheet feuille,
                                        Map<String, Propriete> proprietes,
-                                       Map<String, TitreFoncier> titres,
+                                       Map<String, Propriete> titres,
                                        Map<String, Parcelle> parcelles,
                                        Map<String, Personne> personnes,
                                        Map<String, Object> resume,
@@ -215,19 +212,19 @@ public class ExcelImportService {
             if (numero == null || numero.isEmpty()) continue; // ligne vide
 
             try {
-                TitreFoncier titreFoncier = obtenirTitreFoncier(
+                Propriete propriete = obtenirPropriete(
                         texte(row.getCell(S1_TITRE)),
                         texte(row.getCell(S1_PROPRIETE)),
                         texte(row.getCell(S1_ZONE)),
                         texte(row.getCell(S1_LOCALISATION)),
                         proprietes, titres);
-                if (titreFoncier == null) {
+                if (propriete == null) {
                     erreurs.add("Ligne " + (i + 1) + " : titre foncier manquant — ignorée");
                     continue;
                 }
 
                 Parcelle parcelle = obtenirParcelle(
-                        texte(row.getCell(S1_PARCELLE)), titreFoncier, parcelles);
+                        texte(row.getCell(S1_PARCELLE)), propriete, parcelles);
 
                 String nomPersonne = texte(row.getCell(S1_PERSONNE));
                 String nomAdresse = texte(row.getCell(S1_ADRESSE));
@@ -239,7 +236,7 @@ public class ExcelImportService {
 
                 // 2) Idempotence : la notification existe déjà ?
                 NotificationOccupation existante = notificationDoublon(
-                        titreFoncier, parcelle, dateNotif, personne);
+                        propriete, parcelle, dateNotif, personne);
 
                 CiblesLigne cible = new CiblesLigne();
                 NotificationOccupation notification;
@@ -267,7 +264,7 @@ public class ExcelImportService {
                             .doleances(texte(row.getCell(S1_DOLEANCES)))
                             .actionsEntreprises(texte(row.getCell(S1_ACTIONS)))
                             .statut("En cours")
-                            .titreFoncier(titreFoncier)
+                            .propriete(propriete)
                             .parcelle(parcelle)
                             .build();
                     notificationRepository.save(notification);
@@ -341,7 +338,7 @@ public class ExcelImportService {
 
     private void importerAvertissements(Sheet feuille,
                                         Map<String, Propriete> proprietes,
-                                        Map<String, TitreFoncier> titres,
+                                        Map<String, Propriete> titres,
                                         Map<String, Parcelle> parcelles,
                                         Map<String, Personne> personnes,
                                         Map<String, Object> resume,
@@ -359,19 +356,19 @@ public class ExcelImportService {
             if (numero == null || numero.isEmpty()) continue; // ligne vide
 
             try {
-                TitreFoncier titreFoncier = obtenirTitreFoncier(
+                Propriete propriete = obtenirPropriete(
                         texte(row.getCell(S2_TITRE)),
                         texte(row.getCell(S2_PROPRIETE)),
                         texte(row.getCell(S2_ZONE)),
                         texte(row.getCell(S2_LOCALISATION)),
                         proprietes, titres);
-                if (titreFoncier == null) {
+                if (propriete == null) {
                     erreurs.add("Ligne " + (i + 1) + " : titre foncier manquant — ignorée");
                     continue;
                 }
 
                 Parcelle parcelle = obtenirParcelle(
-                        texte(row.getCell(S2_PARCELLE)), titreFoncier, parcelles);
+                        texte(row.getCell(S2_PARCELLE)), propriete, parcelles);
 
                 String nomPersonne = texte(row.getCell(S2_PERSONNE));
                 LocalDate dateAvert = date(row.getCell(S2_DATE_AVERT));
@@ -379,7 +376,7 @@ public class ExcelImportService {
                 Personne personne = trouverPersonne(nomPersonne, personnes);
 
                 Avertissement existant = avertissementDoublon(
-                        titreFoncier, parcelle, dateAvert, personne != null ? personne.getIdPersonne() : null);
+                        propriete, parcelle, dateAvert, personne != null ? personne.getIdPersonne() : null);
 
                 Avertissement avertissement;
                 if (existant != null) {
@@ -403,7 +400,7 @@ public class ExcelImportService {
                             .aFaire(texte(row.getCell(S2_A_FAIRE)))
                             .mission(texte(row.getCell(S2_MISSION)))
                             .personne(personne)
-                            .titreFoncier(titreFoncier)
+                            .propriete(propriete)
                             .parcelle(parcelle)
                             .build();
                     avertissementRepository.save(avertissement);
@@ -546,29 +543,27 @@ public class ExcelImportService {
     // Référentiels & personnes (avec cache)
     // ─────────────────────────────────────────────────────────────
 
-    private TitreFoncier obtenirTitreFoncier(String numero,
+    private Propriete obtenirPropriete(String numero,
                                              String nomPropriete,
                                              String zone,
                                              String localisation,
                                              Map<String, Propriete> proprietes,
-                                             Map<String, TitreFoncier> titres) {
+                                             Map<String, Propriete> titres) {
         String numeroClean = nettoyer(numero);
         if (numeroClean == null) return null;
 
-        TitreFoncier titre = titres.get(numeroClean);
+        Propriete titre = titres.get(numeroClean);
         if (titre == null) {
-            titre = titreFoncierRepository.findByNumero(numeroClean).orElse(null);
+            titre = proprieteRepository.findByNumero(numeroClean).orElse(null);
         }
         if (titre == null) {
-            Propriete propriete = obtenirPropriete(nomPropriete, proprietes);
-            titre = TitreFoncier.builder()
-                    .idTitreFoncier(UUID.randomUUID())
+                titre = Propriete.builder()
+                    .nom(nettoyer(nomPropriete))
                     .numero(numeroClean)
                     .zone(nettoyer(zone))
                     .localisation(nettoyer(localisation))
-                    .propriete(propriete)
                     .build();
-            titreFoncierRepository.save(titre);
+            proprieteRepository.save(titre);
             titres.put(numeroClean, titre);
             return titre;
         }
@@ -576,39 +571,24 @@ public class ExcelImportService {
         return titre;
     }
 
-    private Propriete obtenirPropriete(String nom, Map<String, Propriete> proprietes) {
-        String nomClean = nettoyer(nom);
-        if (nomClean == null || nomClean.isEmpty()) return null;
-
-        Propriete propriete = proprietes.get(nomClean.toLowerCase());
-        if (propriete == null) {
-            propriete = proprieteRepository.findByNomIgnoreCase(nomClean).orElse(null);
-        }
-        if (propriete == null) {
-            propriete = proprieteRepository.save(Propriete.builder().nom(nomClean).build());
-        }
-        proprietes.put(nomClean.toLowerCase(), propriete);
-        return propriete;
-    }
-
     private Parcelle obtenirParcelle(String numeroLot,
-                                     TitreFoncier titreFoncier,
+                                     Propriete propriete,
                                      Map<String, Parcelle> parcelles) {
         String lotClean = nettoyer(numeroLot);
-        if (lotClean == null || lotClean.isEmpty() || titreFoncier == null) return null;
+        if (lotClean == null || lotClean.isEmpty() || propriete == null) return null;
 
-        String cle = titreFoncier.getIdTitreFoncier() + "|" + lotClean;
+        String cle = propriete.getIdPropriete() + "|" + lotClean;
         Parcelle parcelle = parcelles.get(cle);
         if (parcelle == null) {
             parcelle = parcelleRepository
-                    .findByNumeroLotAndTitreFoncierIdTitreFoncier(lotClean, titreFoncier.getIdTitreFoncier())
+                    .findByNumeroLotAndProprieteIdPropriete(lotClean, propriete.getIdPropriete())
                     .orElse(null);
         }
         if (parcelle == null) {
             parcelle = Parcelle.builder()
                     .idParcelle(UUID.randomUUID())
                     .numeroLot(lotClean)
-                    .titreFoncier(titreFoncier)
+                    .propriete(propriete)
                     .build();
             parcelleRepository.save(parcelle);
         }
@@ -668,11 +648,11 @@ public class ExcelImportService {
     // Détection de doublons (import idempotent)
     // ─────────────────────────────────────────────────────────────
 
-    private NotificationOccupation notificationDoublon(TitreFoncier titre, Parcelle parcelle,
+    private NotificationOccupation notificationDoublon(Propriete titre, Parcelle parcelle,
                                                        LocalDate date, Personne personne) {
         if (titre == null || date == null) return null;
         for (NotificationOccupation n : notificationRepository.trouverDoublons(
-                titre.getIdTitreFoncier(),
+                titre.getIdPropriete(),
                 parcelle != null ? parcelle.getIdParcelle() : null,
                 date)) {
             if (personne == null) return n;
@@ -684,11 +664,11 @@ public class ExcelImportService {
         return null;
     }
 
-    private Avertissement avertissementDoublon(TitreFoncier titre, Parcelle parcelle,
+    private Avertissement avertissementDoublon(Propriete titre, Parcelle parcelle,
                                                LocalDate date, Integer idPersonne) {
         if (titre == null || date == null) return null;
         List<Avertissement> doublons = avertissementRepository.trouverDoublons(
-                titre.getIdTitreFoncier(),
+                titre.getIdPropriete(),
                 parcelle != null ? parcelle.getIdParcelle() : null,
                 date,
                 idPersonne);

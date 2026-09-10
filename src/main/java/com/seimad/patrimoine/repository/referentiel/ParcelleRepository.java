@@ -11,7 +11,7 @@ import java.util.UUID;
 @Repository
 public interface ParcelleRepository extends JpaRepository<Parcelle, UUID> {
 
-    List<Parcelle> findByTitreFoncierIdTitreFoncier(UUID idTitreFoncier);
+    List<Parcelle> findByProprieteIdPropriete(Integer idPropriete);
 
-    Optional<Parcelle> findByNumeroLotAndTitreFoncierIdTitreFoncier(String numeroLot, UUID idTitreFoncier);
+    Optional<Parcelle> findByNumeroLotAndProprieteIdPropriete(String numeroLot, Integer idPropriete);
 }

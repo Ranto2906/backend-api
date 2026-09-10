@@ -38,8 +38,8 @@ public class SignalementDTO {
     private String nomVille;
 
     // Rattachements possibles
-    private UUID idTitreFoncier;
-    private String numeroTitre;
+    private Integer idPropriete;
+    private String numeroPropriete;
     private UUID idParcelle;
     private String numeroLot;
 

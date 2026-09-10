@@ -19,5 +19,5 @@ public class ParcelleRequest {
     private String observation;
 
     @NotBlank(message = "Le titre foncier est obligatoire")
-    private String idTitreFoncier;
+    private Integer idPropriete;
 }

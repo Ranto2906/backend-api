@@ -23,7 +23,7 @@ public interface SignalementRepository extends JpaRepository<Signalement, UUID> 
            "LEFT JOIN s.typeSignalement ts " +
            "LEFT JOIN s.statutSignalement st " +
            "LEFT JOIN s.ville ville " +
-           "LEFT JOIN s.titreFoncier tf " +
+           "LEFT JOIN s.propriete tf " +
            "LEFT JOIN s.parcelle parc " +
            "LEFT JOIN s.utilisateurCreation uc " +
            "WHERE (:search IS NULL OR :search = '' OR " +
@@ -43,7 +43,7 @@ public interface SignalementRepository extends JpaRepository<Signalement, UUID> 
 
     List<Signalement> findByTypeSignalementIdTypeSignalement(Integer idTypeSignalement);
 
-    List<Signalement> findByTitreFoncierIdTitreFoncier(UUID idTitreFoncier);
+       List<Signalement> findByProprieteIdPropriete(Integer idPropriete);
 
     List<Signalement> findByParcelleIdParcelle(UUID idParcelle);
 

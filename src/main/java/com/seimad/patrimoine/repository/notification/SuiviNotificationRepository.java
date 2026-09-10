@@ -25,7 +25,7 @@ public interface SuiviNotificationRepository extends JpaRepository<SuiviNotifica
            "(:search IS NULL OR :search = '' OR " +
            "LOWER(s.constats) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
            "LOWER(s.actionsASuivre) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
-           "LOWER(s.notificationOccupation.titreFoncier.numero) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
+           "LOWER(s.notificationOccupation.propriete.numero) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
            "LOWER(s.notificationOccupation.parcelle.numeroLot) LIKE LOWER(CONCAT('%',:search,'%')))")
     Page<SuiviNotification> search(@Param("search") String search, Pageable pageable);
 }

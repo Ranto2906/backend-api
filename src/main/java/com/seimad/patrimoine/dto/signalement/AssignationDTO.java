@@ -32,12 +32,12 @@ public class AssignationDTO {
     // Si notification
     private UUID idNotification;
     private LocalDate dateNotification;
-    private String numeroTitreNotification;
+    private String numeroProprieteNotification;
 
     // Si avertissement
     private UUID idAvertissement;
     private LocalDate dateAvertissement;
-    private String numeroTitreAvertissement;
+    private String numeroProprieteAvertissement;
 
     // Trace
     private LocalDateTime dateAssignation;

@@ -1,7 +1,7 @@
 package com.seimad.patrimoine.entity.notification;
 
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
+import com.seimad.patrimoine.entity.referentiel.Propriete;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -56,6 +56,6 @@ public class NotificationOccupation {
     private Parcelle parcelle;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_titre_foncier", nullable = false)
-    private TitreFoncier titreFoncier;
+    @JoinColumn(name = "id_propriete", nullable = false)
+    private Propriete propriete;
 }

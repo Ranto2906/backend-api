@@ -29,5 +29,5 @@ public class AvertissementRequest {
     private UUID idParcelle;
 
     @NotNull(message = "Le titre foncier est obligatoire")
-    private UUID idTitreFoncier;
+    private Integer idPropriete;
 }

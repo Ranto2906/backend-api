@@ -32,7 +32,7 @@ public class NotificationOccupationRequest {
     private UUID idParcelle;
 
     @NotNull(message = "Le titre foncier est obligatoire")
-    private UUID idTitreFoncier;
+    private Integer idPropriete;
 
     // Personnes associées (optionnel)
     private List<NotificationPersonneRequest> personnes;

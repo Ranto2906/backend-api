@@ -150,24 +150,14 @@ CREATE TABLE prix_m2(
 CREATE TABLE propriete(
    id_propriete INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
    nom VARCHAR(200) NOT NULL,
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   id_ville INT REFERENCES ville(id_ville),
-   UNIQUE(nom)
-);
-
-CREATE TABLE titre_foncier(
-   id_titre_foncier UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-   numero VARCHAR(50) NOT NULL,
-   type_titre VARCHAR(30) DEFAULT 'Titre Foncier'
-      CHECK(type_titre IN('Titre Foncier','Parcelle Cadastrale')),
+   numero VARCHAR(50),
    zone VARCHAR(150),
    localisation TEXT,
    superficie_totale DECIMAL(12,3),
    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   id_propriete INT NOT NULL REFERENCES propriete(id_propriete),
-   UNIQUE(numero, id_propriete)
+   id_ville INT REFERENCES ville(id_ville),
+   UNIQUE(nom)
 );
 
 CREATE TABLE parcelle(
@@ -178,8 +168,8 @@ CREATE TABLE parcelle(
    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    id_utilisateur_creation INT REFERENCES utilisateur(id_utilisateur),
-   id_titre_foncier UUID NOT NULL REFERENCES titre_foncier(id_titre_foncier),
-   UNIQUE(numero_lot, id_titre_foncier)
+   id_propriete INT NOT NULL REFERENCES propriete(id_propriete),
+   UNIQUE(numero_lot, id_propriete)
 );
 
 -- ============================================================================
@@ -249,7 +239,7 @@ CREATE TABLE dossier_demandeur(
 CREATE TABLE dossier_parcelle(
    id_dossier_parcelle UUID PRIMARY KEY DEFAULT gen_random_uuid(),
    id_dossier INT NOT NULL REFERENCES dossier(id_dossier),
-   id_titre_foncier UUID NOT NULL REFERENCES titre_foncier(id_titre_foncier),
+   id_propriete INT NOT NULL REFERENCES propriete(id_propriete),
    id_parcelle UUID REFERENCES parcelle(id_parcelle),
    superficie_m2 DECIMAL(12,3),
    valeur_demande_ttc DECIMAL(16,2),
@@ -258,7 +248,7 @@ CREATE TABLE dossier_parcelle(
    date_ajout TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    coordonnee_x_ DECIMAL(12,3),      -- brut Laborde, saisi au bureau
    coordonnee_y_ DECIMAL(12,3),
-   UNIQUE(id_dossier, id_titre_foncier, id_parcelle)
+   UNIQUE(id_dossier, id_propriete, id_parcelle)
 );
 
 -- CORRECTION 2 : remplace suivi_dossier.statut_couleur VARCHAR(10) libre.
@@ -325,7 +315,7 @@ CREATE TABLE audit(
    id_audit INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
    entite_type VARCHAR(30) NOT NULL
       CHECK(entite_type IN('dossier','notification_occupation','avertissement',
-                            'parcelle','titre_foncier','propriete','utilisateur',
+                            'parcelle','propriete','utilisateur',
                             'geometrie','signalement','descente_terrain','personne')),   -- CORRECTION 5 + personne
    entite_id TEXT NOT NULL,
    action VARCHAR(20),
@@ -361,7 +351,7 @@ CREATE TABLE notification_occupation(
    statut VARCHAR(30) DEFAULT 'En cours',
    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    id_parcelle UUID REFERENCES parcelle(id_parcelle),
-   id_titre_foncier UUID NOT NULL REFERENCES titre_foncier(id_titre_foncier)
+   id_propriete INT NOT NULL REFERENCES propriete(id_propriete)
 );
 
 CREATE TABLE notification_personne(
@@ -393,7 +383,7 @@ CREATE TABLE avertissement(
    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    id_personne INT REFERENCES personne(id_personne),
    id_parcelle UUID REFERENCES parcelle(id_parcelle),
-   id_titre_foncier UUID NOT NULL REFERENCES titre_foncier(id_titre_foncier)
+   id_propriete INT NOT NULL REFERENCES propriete(id_propriete)
 );
 
 CREATE TABLE photo(
@@ -416,7 +406,7 @@ CREATE INDEX idx_photo_entite ON photo(entite_type, entite_id);
 CREATE TABLE geometrie(
    id_geometrie UUID PRIMARY KEY DEFAULT gen_random_uuid(),
    entite_type VARCHAR(30) NOT NULL
-      CHECK(entite_type IN('parcelle','titre_foncier','dossier_parcelle','signalement','descente_terrain')),  -- CORRECTION 5
+      CHECK(entite_type IN('parcelle','dossier_parcelle','signalement','descente_terrain')),  -- CORRECTION 5
    entite_id UUID NOT NULL,
    type_geometrie VARCHAR(20) NOT NULL CHECK(type_geometrie IN('Point','Polygon','LineString')),
    geom geography(Geometry, 4326) NOT NULL,   -- toujours en WGS84 (règle RG3)
@@ -468,7 +458,7 @@ CREATE TABLE signalement(
    id_type_signalement INT NOT NULL REFERENCES type_signalement(id_type_signalement),
    id_statut_signalement INT REFERENCES statut_signalement(id_statut_signalement),
    id_ville INT REFERENCES ville(id_ville),                        -- nullable
-   id_titre_foncier UUID REFERENCES titre_foncier(id_titre_foncier), -- nullable
+   id_propriete INT REFERENCES propriete(id_propriete), -- nullable
    id_parcelle UUID REFERENCES parcelle(id_parcelle),               -- nullable
    commentaire_traitement TEXT,
    date_traitement TIMESTAMP,

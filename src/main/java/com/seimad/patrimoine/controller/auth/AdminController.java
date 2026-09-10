@@ -103,7 +103,7 @@ public class AdminController {
         stats.put("dossier", auditService.countByEntiteType("dossier"));
         stats.put("utilisateur", auditService.countByEntiteType("utilisateur"));
         stats.put("parcelle", auditService.countByEntiteType("parcelle"));
-        stats.put("titre_foncier", auditService.countByEntiteType("titre_foncier"));
+        stats.put("propriete", auditService.countByEntiteType("propriete"));
         stats.put("geometrie", auditService.countByEntiteType("geometrie"));
         stats.put("signalement", auditService.countByEntiteType("signalement"));
         return ResponseEntity.ok(stats);

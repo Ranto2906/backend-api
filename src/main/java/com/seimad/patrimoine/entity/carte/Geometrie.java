@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Géométrie polymorphe : rattachée à parcelle, titre_foncier,
+ * Géométrie polymorphe : rattachée à parcelle, propriete,
  * dossier_parcelle, signalement ou descente_terrain via (entite_type, entite_id).
  * Utilise PostGIS geography(Geometry, 4326) – coordonnées WGS84.
  */

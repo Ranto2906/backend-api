@@ -53,6 +53,10 @@ public class ProprieteService {
                 .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + request.getIdVille()));
         Propriete propriete = Propriete.builder()
                 .nom(request.getNom())
+            .numero(request.getNumero())
+            .zone(request.getZone())
+            .localisation(request.getLocalisation())
+            .superficieTotale(request.getSuperficieTotale())
                 .ville(ville)
                 .build();
         return toDTO(proprieteRepository.save(propriete));
@@ -65,6 +69,10 @@ public class ProprieteService {
         Ville ville = villeRepository.findById(request.getIdVille())
                 .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + request.getIdVille()));
         propriete.setNom(request.getNom());
+        propriete.setNumero(request.getNumero());
+        propriete.setZone(request.getZone());
+        propriete.setLocalisation(request.getLocalisation());
+        propriete.setSuperficieTotale(request.getSuperficieTotale());
         propriete.setVille(ville);
         propriete.setUpdatedAt(LocalDateTime.now());
         return toDTO(proprieteRepository.save(propriete));
@@ -79,6 +87,10 @@ public class ProprieteService {
         return ProprieteDTO.builder()
                 .idPropriete(p.getIdPropriete())
                 .nom(p.getNom())
+                .numero(p.getNumero())
+                .zone(p.getZone())
+                .localisation(p.getLocalisation())
+                .superficieTotale(p.getSuperficieTotale())
                 .idVille(p.getVille() != null ? p.getVille().getIdVille() : null)
                 .nomVille(p.getVille() != null ? p.getVille().getNomVille() : null)
                 .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)

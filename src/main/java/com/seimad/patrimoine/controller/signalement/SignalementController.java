@@ -187,10 +187,10 @@ public class SignalementController {
         return ResponseEntity.ok(signalementService.listerParType(idType));
     }
 
-    @GetMapping("/titre-foncier/{idTitreFoncier}")
+    @GetMapping("/propriete/{idPropriete}")
     @Operation(summary = "Lister les signalements par titre foncier")
-    public ResponseEntity<List<SignalementDTO>> listerParTitreFoncier(@PathVariable UUID idTitreFoncier) {
-        return ResponseEntity.ok(signalementService.listerParTitreFoncier(idTitreFoncier));
+    public ResponseEntity<List<SignalementDTO>> listerParPropriete(@PathVariable Integer idPropriete) {
+        return ResponseEntity.ok(signalementService.listerParPropriete(idPropriete));
     }
 
     @GetMapping("/parcelle/{idParcelle}")

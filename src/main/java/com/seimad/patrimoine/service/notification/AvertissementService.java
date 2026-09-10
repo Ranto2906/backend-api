@@ -5,11 +5,11 @@ import com.seimad.patrimoine.dto.notification.AvertissementRequest;
 import com.seimad.patrimoine.entity.notification.Avertissement;
 import com.seimad.patrimoine.entity.notification.Personne;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
+import com.seimad.patrimoine.entity.referentiel.Propriete;
 import com.seimad.patrimoine.repository.notification.AvertissementRepository;
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
-import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
+import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
 import com.seimad.patrimoine.service.dossier.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +32,7 @@ public class AvertissementService {
     private final AvertissementRepository avertissementRepository;
     private final PersonneRepository personneRepository;
     private final ParcelleRepository parcelleRepository;
-    private final TitreFoncierRepository titreFoncierRepository;
+    private final ProprieteRepository proprieteRepository;
     private final AuditService auditService;
 
     // ── CRUD ──
@@ -58,7 +58,7 @@ public class AvertissementService {
     public AvertissementDTO creer(AvertissementRequest request) {
         Personne personne = personneRepository.findById(request.getIdPersonne())
                 .orElseThrow(() -> new RuntimeException("Personne non trouvée avec l'id : " + request.getIdPersonne()));
-        TitreFoncier titreFoncier = titreFoncierRepository.findById(request.getIdTitreFoncier())
+        Propriete propriete = proprieteRepository.findById(request.getIdPropriete())
                 .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé"));
         Parcelle parcelle = parcelleRepository.findById(request.getIdParcelle())
                 .orElseThrow(() -> new RuntimeException("Parcelle non trouvée"));
@@ -73,7 +73,7 @@ public class AvertissementService {
                 .aFaire(request.getAFaire())
                 .mission(request.getMission())
                 .personne(personne)
-                .titreFoncier(titreFoncier)
+                .propriete(propriete)
                 .parcelle(parcelle)
                 .build();
         Avertissement saved = avertissementRepository.save(avertissement);
@@ -100,7 +100,7 @@ public class AvertissementService {
 
         Personne personne = personneRepository.findById(request.getIdPersonne())
                 .orElseThrow(() -> new RuntimeException("Personne non trouvée avec l'id : " + request.getIdPersonne()));
-        TitreFoncier titreFoncier = titreFoncierRepository.findById(request.getIdTitreFoncier())
+        Propriete propriete = proprieteRepository.findById(request.getIdPropriete())
                 .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé"));
         Parcelle parcelle = parcelleRepository.findById(request.getIdParcelle())
                 .orElseThrow(() -> new RuntimeException("Parcelle non trouvée"));
@@ -113,7 +113,7 @@ public class AvertissementService {
         avertissement.setAFaire(request.getAFaire());
         avertissement.setMission(request.getMission());
         avertissement.setPersonne(personne);
-        avertissement.setTitreFoncier(titreFoncier);
+        avertissement.setPropriete(propriete);
         avertissement.setParcelle(parcelle);
 
         Avertissement saved = avertissementRepository.save(avertissement);
@@ -167,8 +167,8 @@ public class AvertissementService {
     }
 
     @Transactional(readOnly = true)
-    public List<AvertissementDTO> listerParTitreFoncier(UUID idTitreFoncier) {
-        return avertissementRepository.findByTitreFoncierIdTitreFoncier(idTitreFoncier).stream()
+        public List<AvertissementDTO> listerParPropriete(Integer idPropriete) {
+        return avertissementRepository.findByProprieteIdPropriete(idPropriete).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -202,7 +202,7 @@ public class AvertissementService {
         valeurs.put("actionsEntreprises", a.getActionsEntreprises());
         valeurs.put("aFaire", a.getAFaire());
         valeurs.put("mission", a.getMission());
-        valeurs.put("numeroTitre", a.getTitreFoncier() != null ? a.getTitreFoncier().getNumero() : null);
+        valeurs.put("numeroPropriete", a.getPropriete() != null ? a.getPropriete().getNumero() : null);
         valeurs.put("numeroLot", a.getParcelle() != null ? a.getParcelle().getNumeroLot() : null);
 
         Personne p = a.getPersonne();
@@ -223,8 +223,8 @@ public class AvertissementService {
                 .createdAt(a.getCreatedAt())
                 .idParcelle(a.getParcelle() != null ? a.getParcelle().getIdParcelle() : null)
                 .numeroLot(a.getParcelle() != null ? a.getParcelle().getNumeroLot() : null)
-                .idTitreFoncier(a.getTitreFoncier() != null ? a.getTitreFoncier().getIdTitreFoncier() : null)
-                .numeroTitre(a.getTitreFoncier() != null ? a.getTitreFoncier().getNumero() : null)
+                .idPropriete(a.getPropriete() != null ? a.getPropriete().getIdPropriete() : null)
+                .numeroPropriete(a.getPropriete() != null ? a.getPropriete().getNumero() : null)
                 .idPersonne(a.getPersonne() != null ? a.getPersonne().getIdPersonne() : null)
                 .nomPersonne(a.getPersonne() != null ? a.getPersonne().getNom() : null)
                 .build();

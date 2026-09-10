@@ -27,8 +27,8 @@ public class AvertissementDTO {
     // Relations
     private UUID idParcelle;
     private String numeroLot;
-    private UUID idTitreFoncier;
-    private String numeroTitre;
+    private Integer idPropriete;
+    private String numeroPropriete;
 
     // Personne associée
     private Integer idPersonne;

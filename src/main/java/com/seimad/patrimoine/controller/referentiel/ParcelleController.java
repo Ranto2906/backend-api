@@ -31,10 +31,10 @@ public class ParcelleController {
         return ResponseEntity.ok(parcelleService.lister(pageable));
     }
 
-    @GetMapping("/titre-foncier/{idTitreFoncier}")
+    @GetMapping("/propriete/{idPropriete}")
     @Operation(summary = "Lister les parcelles d'un titre foncier")
-    public ResponseEntity<List<ParcelleDTO>> listerParTitreFoncier(@PathVariable UUID idTitreFoncier) {
-        return ResponseEntity.ok(parcelleService.listerParTitreFoncier(idTitreFoncier));
+    public ResponseEntity<List<ParcelleDTO>> listerParPropriete(@PathVariable Integer idPropriete) {
+        return ResponseEntity.ok(parcelleService.listerParPropriete(idPropriete));
     }
 
     @GetMapping("/{id}")

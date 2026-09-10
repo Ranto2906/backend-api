@@ -12,7 +12,7 @@ import com.seimad.patrimoine.entity.dossier.Dossier;
 import com.seimad.patrimoine.entity.notification.Avertissement;
 import com.seimad.patrimoine.entity.notification.NotificationOccupation;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
+import com.seimad.patrimoine.entity.referentiel.Propriete;
 import com.seimad.patrimoine.entity.referentiel.Ville;
 import com.seimad.patrimoine.entity.signalement.Assignation;
 import com.seimad.patrimoine.entity.signalement.Signalement;
@@ -23,7 +23,7 @@ import com.seimad.patrimoine.repository.carte.GeometrieRepository;
 import com.seimad.patrimoine.repository.notification.AvertissementRepository;
 import com.seimad.patrimoine.repository.notification.NotificationOccupationRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
-import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
+import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
 import com.seimad.patrimoine.repository.referentiel.VilleRepository;
 import com.seimad.patrimoine.repository.signalement.AssignationRepository;
 import com.seimad.patrimoine.repository.signalement.SignalementRepository;
@@ -61,7 +61,7 @@ public class SignalementService {
     private final TypeSignalementRepository typeSignalementRepository;
     private final StatutSignalementRepository statutSignalementRepository;
     private final VilleRepository villeRepository;
-    private final TitreFoncierRepository titreFoncierRepository;
+    private final ProprieteRepository proprieteRepository;
     private final ParcelleRepository parcelleRepository;
     private final NotificationOccupationRepository notificationOccupationRepository;
     private final AvertissementRepository avertissementRepository;
@@ -130,7 +130,7 @@ public class SignalementService {
                 .dateSignalement(request.getDateSignalement() != null ? request.getDateSignalement() : LocalDateTime.now())
                 .typeSignalement(type)
                 .ville(resoudreVille(request.getIdVille()))
-                .titreFoncier(resoudreTitreFoncier(request.getIdTitreFoncier()))
+                .propriete(resoudrePropriete(request.getIdPropriete()))
                 .parcelle(resoudreParcelle(request.getIdParcelle()))
                 .dossier(resoudreDossier(request.getIdDossier()))
                 .utilisateurCreation(resoudreUtilisateur(request.getIdUtilisateurCreation()))
@@ -177,7 +177,7 @@ public class SignalementService {
                     .orElseThrow(() -> new RuntimeException("Statut de signalement non trouvé")));
         }
         signalement.setVille(resoudreVille(request.getIdVille()));
-        signalement.setTitreFoncier(resoudreTitreFoncier(request.getIdTitreFoncier()));
+        signalement.setPropriete(resoudrePropriete(request.getIdPropriete()));
         signalement.setParcelle(resoudreParcelle(request.getIdParcelle()));
         signalement.setDossier(resoudreDossier(request.getIdDossier()));
         if (request.getIdUtilisateurCreation() != null) {
@@ -346,8 +346,8 @@ public class SignalementService {
     }
 
     @Transactional(readOnly = true)
-    public List<SignalementDTO> listerParTitreFoncier(UUID idTitreFoncier) {
-        return signalementRepository.findByTitreFoncierIdTitreFoncier(idTitreFoncier).stream()
+        public List<SignalementDTO> listerParPropriete(Integer idPropriete) {
+        return signalementRepository.findByProprieteIdPropriete(idPropriete).stream()
                 .map(this::toDTO).collect(Collectors.toList());
     }
 
@@ -399,9 +399,9 @@ public class SignalementService {
                 .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + idVille)) : null;
     }
 
-    private TitreFoncier resoudreTitreFoncier(UUID id) {
-        return id != null ? titreFoncierRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé avec l'id : " + id)) : null;
+    private Propriete resoudrePropriete(Integer id) {
+        return id != null ? proprieteRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Propriété non trouvée avec l'id : " + id)) : null;
     }
 
     private Parcelle resoudreParcelle(UUID id) {
@@ -462,7 +462,7 @@ public class SignalementService {
         valeurs.put("typeSignalement", s.getTypeSignalement() != null ? s.getTypeSignalement().getLibelle() : null);
         valeurs.put("statutSignalement", s.getStatutSignalement() != null ? s.getStatutSignalement().getLibelle() : null);
         valeurs.put("ville", s.getVille() != null ? s.getVille().getNomVille() : null);
-        valeurs.put("numeroTitre", s.getTitreFoncier() != null ? s.getTitreFoncier().getNumero() : null);
+        valeurs.put("numeroPropriete", s.getPropriete() != null ? s.getPropriete().getNumero() : null);
         valeurs.put("numeroLot", s.getParcelle() != null ? s.getParcelle().getNumeroLot() : null);
         valeurs.put("commentaireTraitement", s.getCommentaireTraitement());
         valeurs.put("dateTraitement", s.getDateTraitement());
@@ -495,15 +495,15 @@ public class SignalementService {
             b.typeCible("notification")
                     .idNotification(a.getNotification().getIdNotification())
                     .dateNotification(a.getNotification().getDateNotification())
-                    .numeroTitreNotification(a.getNotification().getTitreFoncier() != null
-                            ? a.getNotification().getTitreFoncier().getNumero() : null);
+                    .numeroProprieteNotification(a.getNotification().getPropriete() != null
+                            ? a.getNotification().getPropriete().getNumero() : null);
         }
         if (a.getAvertissement() != null) {
             b.typeCible("avertissement")
                     .idAvertissement(a.getAvertissement().getIdAvertissement())
                     .dateAvertissement(a.getAvertissement().getDateAvertissement())
-                    .numeroTitreAvertissement(a.getAvertissement().getTitreFoncier() != null
-                            ? a.getAvertissement().getTitreFoncier().getNumero() : null);
+                    .numeroProprieteAvertissement(a.getAvertissement().getPropriete() != null
+                            ? a.getAvertissement().getPropriete().getNumero() : null);
         }
         return b.build();
     }
@@ -526,8 +526,8 @@ public class SignalementService {
                 .statutFinal(s.getStatutSignalement() != null ? s.getStatutSignalement().getEstFinal() : null)
                 .idVille(s.getVille() != null ? s.getVille().getIdVille() : null)
                 .nomVille(s.getVille() != null ? s.getVille().getNomVille() : null)
-                .idTitreFoncier(s.getTitreFoncier() != null ? s.getTitreFoncier().getIdTitreFoncier() : null)
-                .numeroTitre(s.getTitreFoncier() != null ? s.getTitreFoncier().getNumero() : null)
+                .idPropriete(s.getPropriete() != null ? s.getPropriete().getIdPropriete() : null)
+                .numeroPropriete(s.getPropriete() != null ? s.getPropriete().getNumero() : null)
                 .idParcelle(s.getParcelle() != null ? s.getParcelle().getIdParcelle() : null)
                 .numeroLot(s.getParcelle() != null ? s.getParcelle().getNumeroLot() : null)
                 .commentaireTraitement(s.getCommentaireTraitement())

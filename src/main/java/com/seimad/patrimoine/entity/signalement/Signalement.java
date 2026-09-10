@@ -3,7 +3,7 @@ package com.seimad.patrimoine.entity.signalement;
 import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.dossier.Dossier;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
+import com.seimad.patrimoine.entity.referentiel.Propriete;
 import com.seimad.patrimoine.entity.referentiel.Ville;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,8 +56,8 @@ public class Signalement {
     private Ville ville;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_titre_foncier")
-    private TitreFoncier titreFoncier;
+    @JoinColumn(name = "id_propriete")
+    private Propriete propriete;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_parcelle")

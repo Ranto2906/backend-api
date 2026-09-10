@@ -9,6 +9,7 @@ DELETE	/api/villes/{id}	Supprimer
 
 
 🏠 /api/proprietes — ProprieteController
+Champs : nom, numero, zone, localisation, superficieTotale, idVille, createdAt, updatedAt
 GET	/api/proprietes	Lister (pagination)
 GET	/api/proprietes/search?search=	Rechercher par nom
 GET	/api/proprietes/ville/{idVille}	Lister par ville
@@ -16,15 +17,6 @@ GET	/api/proprietes/{id}	Détail
 POST	/api/proprietes	Créer
 PUT	/api/proprietes/{id}	Modifier
 DELETE	/api/proprietes/{id}	Supprimer
-
-
-📄 /api/titres-fonciers — TitreFoncierController
-GET	/api/titres-fonciers	Lister (pagination)
-GET	/api/titres-fonciers/{id}	Détail
-GET	/api/titres-fonciers/numero/{numero}	Rechercher par numéro
-POST	/api/titres-fonciers	Créer
-PUT	/api/titres-fonciers/{id}	Modifier
-DELETE	/api/titres-fonciers/{id}	Supprimer
 
 
 💰 /api/prix-m2 — PrixM2Controller

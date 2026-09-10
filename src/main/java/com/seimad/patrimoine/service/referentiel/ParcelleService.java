@@ -3,9 +3,9 @@ package com.seimad.patrimoine.service.referentiel;
 import com.seimad.patrimoine.dto.referentiel.ParcelleDTO;
 import com.seimad.patrimoine.dto.referentiel.ParcelleRequest;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
+import com.seimad.patrimoine.entity.referentiel.Propriete;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
-import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
+import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 public class ParcelleService {
 
     private final ParcelleRepository parcelleRepository;
-    private final TitreFoncierRepository titreFoncierRepository;
+    private final ProprieteRepository proprieteRepository;
 
     @Transactional(readOnly = true)
     public Page<ParcelleDTO> lister(Pageable pageable) {
@@ -32,8 +32,8 @@ public class ParcelleService {
     }
 
     @Transactional(readOnly = true)
-    public List<ParcelleDTO> listerParTitreFoncier(UUID idTitreFoncier) {
-        return parcelleRepository.findByTitreFoncierIdTitreFoncier(idTitreFoncier)
+    public List<ParcelleDTO> listerParPropriete(Integer idPropriete) {
+        return parcelleRepository.findByProprieteIdPropriete(idPropriete)
                 .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
@@ -46,14 +46,14 @@ public class ParcelleService {
 
     @Transactional
     public ParcelleDTO creer(ParcelleRequest request) {
-        TitreFoncier tf = titreFoncierRepository.findById(UUID.fromString(request.getIdTitreFoncier()))
-                .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé avec l'id : " + request.getIdTitreFoncier()));
+        Propriete tf = proprieteRepository.findById(request.getIdPropriete())
+                .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé avec l'id : " + request.getIdPropriete()));
         Parcelle parcelle = Parcelle.builder()
                 .idParcelle(request.getIdParcelle() != null ? UUID.fromString(request.getIdParcelle()) : UUID.randomUUID())
                 .numeroLot(request.getNumeroLot())
                 .superficieM2(request.getSuperficieM2())
                 .observation(request.getObservation())
-                .titreFoncier(tf)
+                .propriete(tf)
                 .build();
         return toDTO(parcelleRepository.save(parcelle));
     }
@@ -62,12 +62,12 @@ public class ParcelleService {
     public ParcelleDTO mettreAJour(UUID id, ParcelleRequest request) {
         Parcelle parcelle = parcelleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Parcelle non trouvée avec l'id : " + id));
-        TitreFoncier tf = titreFoncierRepository.findById(UUID.fromString(request.getIdTitreFoncier()))
-                .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé avec l'id : " + request.getIdTitreFoncier()));
+        Propriete tf = proprieteRepository.findById(request.getIdPropriete())
+                .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé avec l'id : " + request.getIdPropriete()));
         parcelle.setNumeroLot(request.getNumeroLot());
         parcelle.setSuperficieM2(request.getSuperficieM2());
         parcelle.setObservation(request.getObservation());
-        parcelle.setTitreFoncier(tf);
+        parcelle.setPropriete(tf);
         parcelle.setUpdatedAt(LocalDateTime.now());
         return toDTO(parcelleRepository.save(parcelle));
     }
@@ -83,8 +83,8 @@ public class ParcelleService {
                 .numeroLot(p.getNumeroLot())
                 .superficieM2(p.getSuperficieM2())
                 .observation(p.getObservation())
-                .idTitreFoncier(p.getTitreFoncier() != null ? p.getTitreFoncier().getIdTitreFoncier().toString() : null)
-                .numeroTitreFoncier(p.getTitreFoncier() != null ? p.getTitreFoncier().getNumero() : null)
+                .idPropriete(p.getPropriete() != null ? p.getPropriete().getIdPropriete() : null)
+                .numeroPropriete(p.getPropriete() != null ? p.getPropriete().getNumero() : null)
                 .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
                 .updatedAt(p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : null)
                 .build();

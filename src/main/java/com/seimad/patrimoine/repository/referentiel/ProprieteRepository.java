@@ -16,6 +16,8 @@ public interface ProprieteRepository extends JpaRepository<Propriete, Integer> {
 
     Optional<Propriete> findByNomIgnoreCase(String nom);
 
+    Optional<Propriete> findByNumero(String numero);
+
     @Query("SELECT p FROM Propriete p WHERE LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%'))")
     List<Propriete> search(@Param("search") String search);
 }

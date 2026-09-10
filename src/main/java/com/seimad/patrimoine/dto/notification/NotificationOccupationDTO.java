@@ -29,8 +29,8 @@ public class NotificationOccupationDTO {
     // Relations
     private UUID idParcelle;
     private String numeroLot;
-    private UUID idTitreFoncier;
-    private String numeroTitre;
+    private Integer idPropriete;
+    private String numeroPropriete;
 
     // Personnes associées
     private List<NotificationPersonneDTO> personnes;

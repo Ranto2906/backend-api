@@ -5,12 +5,12 @@ import com.seimad.patrimoine.entity.notification.NotificationOccupation;
 import com.seimad.patrimoine.entity.notification.NotificationPersonne;
 import com.seimad.patrimoine.entity.notification.Personne;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
-import com.seimad.patrimoine.entity.referentiel.TitreFoncier;
+import com.seimad.patrimoine.entity.referentiel.Propriete;
 import com.seimad.patrimoine.repository.notification.NotificationOccupationRepository;
 import com.seimad.patrimoine.repository.notification.NotificationPersonneRepository;
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
-import com.seimad.patrimoine.repository.referentiel.TitreFoncierRepository;
+import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
 import com.seimad.patrimoine.service.dossier.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ public class NotificationService {
     private final NotificationPersonneRepository notificationPersonneRepository;
     private final PersonneRepository personneRepository;
     private final ParcelleRepository parcelleRepository;
-    private final TitreFoncierRepository titreFoncierRepository;
+    private final ProprieteRepository proprieteRepository;
     private final AuditService auditService;
 
     // ── CRUD ──
@@ -55,7 +55,7 @@ public class NotificationService {
 
     @Transactional
     public NotificationOccupationDTO creer(NotificationOccupationRequest request) {
-        TitreFoncier titreFoncier = titreFoncierRepository.findById(request.getIdTitreFoncier())
+        Propriete propriete = proprieteRepository.findById(request.getIdPropriete())
                 .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé"));
         Parcelle parcelle = parcelleRepository.findById(request.getIdParcelle())
                 .orElseThrow(() -> new RuntimeException("Parcelle non trouvée"));
@@ -70,7 +70,7 @@ public class NotificationService {
                 .doleances(request.getDoleances())
                 .actionsEntreprises(request.getActionsEntreprises())
                 .statut(request.getStatut())
-                .titreFoncier(titreFoncier)
+                .propriete(propriete)
                 .parcelle(parcelle)
                 .build();
         notification = notificationRepository.save(notification);
@@ -114,7 +114,7 @@ public class NotificationService {
         // ── Anciennes valeurs AVANT modification ──
         Map<String, Object> anciennesValeurs = valeursAudit(notification);
 
-        TitreFoncier titreFoncier = titreFoncierRepository.findById(request.getIdTitreFoncier())
+        Propriete propriete = proprieteRepository.findById(request.getIdPropriete())
                 .orElseThrow(() -> new RuntimeException("Titre foncier non trouvé"));
         Parcelle parcelle = parcelleRepository.findById(request.getIdParcelle())
                 .orElseThrow(() -> new RuntimeException("Parcelle non trouvée"));
@@ -127,7 +127,7 @@ public class NotificationService {
         notification.setDoleances(request.getDoleances());
         notification.setActionsEntreprises(request.getActionsEntreprises());
         notification.setStatut(request.getStatut());
-        notification.setTitreFoncier(titreFoncier);
+        notification.setPropriete(propriete);
         notification.setParcelle(parcelle);
 
         // Mettre à jour les personnes
@@ -203,8 +203,8 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
-    public List<NotificationOccupationDTO> listerParTitreFoncier(UUID idTitreFoncier) {
-        return notificationRepository.findByTitreFoncierIdTitreFoncier(idTitreFoncier).stream()
+        public List<NotificationOccupationDTO> listerParPropriete(Integer idPropriete) {
+        return notificationRepository.findByProprieteIdPropriete(idPropriete).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -244,7 +244,7 @@ public class NotificationService {
         valeurs.put("doleances", n.getDoleances());
         valeurs.put("actionsEntreprises", n.getActionsEntreprises());
         valeurs.put("statut", n.getStatut());
-        valeurs.put("numeroTitre", n.getTitreFoncier() != null ? n.getTitreFoncier().getNumero() : null);
+        valeurs.put("numeroPropriete", n.getPropriete() != null ? n.getPropriete().getNumero() : null);
         valeurs.put("numeroLot", n.getParcelle() != null ? n.getParcelle().getNumeroLot() : null);
 
         String personnes = notificationPersonneRepository.findByIdNotification(n.getIdNotification()).stream()
@@ -276,8 +276,8 @@ public class NotificationService {
                 .createdAt(n.getCreatedAt())
                 .idParcelle(n.getParcelle() != null ? n.getParcelle().getIdParcelle() : null)
                 .numeroLot(n.getParcelle() != null ? n.getParcelle().getNumeroLot() : null)
-                .idTitreFoncier(n.getTitreFoncier() != null ? n.getTitreFoncier().getIdTitreFoncier() : null)
-                .numeroTitre(n.getTitreFoncier() != null ? n.getTitreFoncier().getNumero() : null)
+                .idPropriete(n.getPropriete() != null ? n.getPropriete().getIdPropriete() : null)
+                .numeroPropriete(n.getPropriete() != null ? n.getPropriete().getNumero() : null)
                 .personnes(personnes.stream().map(this::toPersonneDTO).collect(Collectors.toList()))
                 .build();
     }

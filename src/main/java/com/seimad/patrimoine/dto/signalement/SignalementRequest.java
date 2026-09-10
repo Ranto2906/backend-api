@@ -34,7 +34,7 @@ public class SignalementRequest {
      *  Reçue du mobile en GeoJSON (ex. {"type":"Point","coordinates":[lng,lat]}). */
     private GeometrieRequest geometrie;
 
-    private UUID idTitreFoncier;
+    private Integer idPropriete;
 
     private UUID idParcelle;
 

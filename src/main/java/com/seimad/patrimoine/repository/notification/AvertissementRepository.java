@@ -18,7 +18,7 @@ public interface AvertissementRepository extends JpaRepository<Avertissement, UU
 
     List<Avertissement> findByAnnee(Integer annee);
 
-    List<Avertissement> findByTitreFoncierIdTitreFoncier(UUID idTitreFoncier);
+       List<Avertissement> findByProprieteIdPropriete(Integer idPropriete);
 
     List<Avertissement> findByParcelleIdParcelle(UUID idParcelle);
 
@@ -30,11 +30,11 @@ public interface AvertissementRepository extends JpaRepository<Avertissement, UU
     Page<Avertissement> search(@Param("search") String search, Pageable pageable);
 
     /** Doublons d'import potentiels : même titre, même parcelle, même date et même personne. */
-    @Query("SELECT a FROM Avertissement a WHERE a.titreFoncier.idTitreFoncier = :tf " +
+    @Query("SELECT a FROM Avertissement a WHERE a.propriete.idPropriete = :tf " +
            "AND a.dateAvertissement = :date AND " +
            "((:parc IS NULL AND a.parcelle IS NULL) OR (:parc IS NOT NULL AND a.parcelle.idParcelle = :parc)) AND " +
            "((:pers IS NULL AND a.personne IS NULL) OR (:pers IS NOT NULL AND a.personne.idPersonne = :pers))")
-    List<Avertissement> trouverDoublons(@Param("tf") UUID idTitreFoncier,
+       List<Avertissement> trouverDoublons(@Param("tf") Integer idPropriete,
                                         @Param("parc") UUID idParcelle,
                                         @Param("date") java.time.LocalDate dateAvertissement,
                                         @Param("pers") Integer idPersonne);

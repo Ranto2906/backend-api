@@ -98,11 +98,11 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.listerParAnnee(annee));
     }
 
-    @GetMapping("/titre-foncier/{idTitreFoncier}")
+    @GetMapping("/propriete/{idPropriete}")
     @Operation(summary = "Lister les notifications par titre foncier")
-    public ResponseEntity<List<NotificationOccupationDTO>> listerParTitreFoncier(
-            @PathVariable UUID idTitreFoncier) {
-        return ResponseEntity.ok(notificationService.listerParTitreFoncier(idTitreFoncier));
+    public ResponseEntity<List<NotificationOccupationDTO>> listerParPropriete(
+            @PathVariable Integer idPropriete) {
+        return ResponseEntity.ok(notificationService.listerParPropriete(idPropriete));
     }
 
     @GetMapping("/parcelle/{idParcelle}")
