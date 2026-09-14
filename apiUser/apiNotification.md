@@ -41,3 +41,7 @@ GET /api/avertissements/annee/{annee}	Par année
 GET /api/avertissements/titre-foncier/{id}	Par titre foncier
 GET /api/avertissements/parcelle/{id}	Par parcelle
 GET /api/avertissements/stats	Statistiques
+
+
+
+

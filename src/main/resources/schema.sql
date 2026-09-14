@@ -147,18 +147,7 @@ CREATE TABLE prix_m2(
 -- UUID : parcelle/titre_foncier sont ciblés en polymorphe par geometrie/photo
 -- ============================================================================
 
-CREATE TABLE propriete(
-   id_propriete INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-   nom VARCHAR(200) NOT NULL,
-   numero VARCHAR(50),
-   zone VARCHAR(150),
-   localisation TEXT,
-   superficie_totale DECIMAL(12,3),
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   id_ville INT REFERENCES ville(id_ville),
-   UNIQUE(nom)
-);
+GET /api/proprietes?page=0&size=20&sort=nom,asc
 
 CREATE TABLE parcelle(
    id_parcelle UUID PRIMARY KEY DEFAULT gen_random_uuid(),
