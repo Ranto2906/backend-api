@@ -325,6 +325,18 @@ public class SignalementService {
                 .map(this::toAssignationDTO).collect(Collectors.toList());
     }
 
+    // ── Géométrie du signalement ──
+
+    /**
+     * Géométrie du constat (position GPS / tracé) stockée dans la table
+     * `geometrie` — renvoyée au frontend pour afficher la carte comme sur le
+     * mobile. Liste vide si aucun relevé n'existe (signalement créé sans GPS).
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> geometrie(UUID idSignalement) {
+        return geometrieRepository.projeterParEntite("signalement", idSignalement);
+    }
+
     // ── Filtres ──
 
     @Transactional(readOnly = true)

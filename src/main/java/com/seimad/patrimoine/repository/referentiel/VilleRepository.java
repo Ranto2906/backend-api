@@ -14,6 +14,8 @@ public interface VilleRepository extends JpaRepository<Ville, Integer> {
 
     Optional<Ville> findByNomVille(String nomVille);
 
+    Optional<Ville> findByNomVilleIgnoreCase(String nomVille);
+
     boolean existsByNomVille(String nomVille);
 
     @Query("SELECT v FROM Ville v WHERE LOWER(v.nomVille) LIKE LOWER(CONCAT('%', :search, '%'))")

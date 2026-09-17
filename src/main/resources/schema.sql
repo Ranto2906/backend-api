@@ -231,8 +231,6 @@ CREATE TABLE dossier_parcelle(
    id_propriete INT NOT NULL REFERENCES propriete(id_propriete),
    id_parcelle UUID REFERENCES parcelle(id_parcelle),
    superficie_m2 DECIMAL(12,3),
-   valeur_demande_ttc DECIMAL(16,2),
-   valeur_demande_ht DECIMAL(16,2),
    observation TEXT,
    date_ajout TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    coordonnee_x_ DECIMAL(12,3),      -- brut Laborde, saisi au bureau
@@ -395,7 +393,7 @@ CREATE INDEX idx_photo_entite ON photo(entite_type, entite_id);
 CREATE TABLE geometrie(
    id_geometrie UUID PRIMARY KEY DEFAULT gen_random_uuid(),
    entite_type VARCHAR(30) NOT NULL
-      CHECK(entite_type IN('parcelle','dossier_parcelle','signalement','descente_terrain')),  -- CORRECTION 5
+      CHECK(entite_type IN('parcelle','dossier_parcelle','signalement','descente_terrain','propriete')),
    entite_id UUID NOT NULL,
    type_geometrie VARCHAR(20) NOT NULL CHECK(type_geometrie IN('Point','Polygon','LineString')),
    geom geography(Geometry, 4326) NOT NULL,   -- toujours en WGS84 (règle RG3)
@@ -485,8 +483,8 @@ CREATE TABLE descente_terrain(
    date_modification TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    id_utilisateur_creation INT NOT NULL REFERENCES utilisateur(id_utilisateur),
    id_utilisateur_validation INT REFERENCES utilisateur(id_utilisateur),
-   id_demandeur INT NOT NULL REFERENCES demandeur(id_demandeur),
-   id_dossier_parcelle UUID NOT NULL REFERENCES dossier_parcelle(id_dossier_parcelle)
+   id_personne INT REFERENCES personne(id_personne),
+   id_dossier_parcelle UUID REFERENCES dossier_parcelle(id_dossier_parcelle)
 );
 CREATE INDEX idx_descente_dossier_parcelle ON descente_terrain(id_dossier_parcelle);
 

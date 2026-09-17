@@ -72,11 +72,13 @@ public class DescenteTerrain {
     @JoinColumn(name = "id_utilisateur_validation")
     private Utilisateur utilisateurValidation;
 
+    /** Nullable : les descentes saisies hors-ligne n'ont pas encore d'id serveur. */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_personne", nullable = false)
+    @JoinColumn(name = "id_personne")
     private Personne personne;
 
+    /** Nullable : résolu à la synchronisation si le dossier est retrouvé. */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_dossier_parcelle", nullable = false)
+    @JoinColumn(name = "id_dossier_parcelle")
     private DossierParcelle dossierParcelle;
 }

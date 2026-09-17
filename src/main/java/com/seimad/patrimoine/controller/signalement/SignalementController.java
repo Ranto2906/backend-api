@@ -69,6 +69,12 @@ public class SignalementController {
         return ResponseEntity.ok(signalementService.trouverParId(id));
     }
 
+    @GetMapping("/{id}/geometrie")
+    @Operation(summary = "Géométrie du constat (position GPS / tracé PostGIS → GeoJSON)")
+    public ResponseEntity<List<Map<String, Object>>> geometrie(@PathVariable UUID id) {
+        return ResponseEntity.ok(signalementService.geometrie(id));
+    }
+
     @PostMapping
     @Operation(summary = "Créer un signalement (référence auto SIG-AAAA-NNNN si absente)")
     public ResponseEntity<SignalementDTO> creer(@Valid @RequestBody SignalementRequest request) {

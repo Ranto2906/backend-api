@@ -43,12 +43,6 @@ public class DossierParcelle {
     @Column(name = "superficie_m2", precision = 12, scale = 3)
     private BigDecimal superficieM2;
 
-    @Column(name = "valeur_demande_ttc", precision = 16, scale = 2)
-    private BigDecimal valeurDemandeTtc;
-
-    @Column(name = "valeur_demande_ht", precision = 16, scale = 2)
-    private BigDecimal valeurDemandeHt;
-
     @Column(name = "observation", columnDefinition = "TEXT")
     private String observation;
 
@@ -56,9 +50,5 @@ public class DossierParcelle {
     @Builder.Default
     private LocalDateTime dateAjout = LocalDateTime.now();
 
-    @Column(name = "coordonnee_x_", precision = 12, scale = 3)
-    private BigDecimal coordonneeX;
 
-    @Column(name = "coordonnee_y_", precision = 12, scale = 3)
-    private BigDecimal coordonneeY;
 }

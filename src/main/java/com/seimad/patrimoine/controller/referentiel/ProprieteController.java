@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/proprietes")
@@ -46,6 +47,12 @@ public class ProprieteController {
     @Operation(summary = "Détail d'une propriété")
     public ResponseEntity<ProprieteDTO> trouverParId(@PathVariable Integer id) {
         return ResponseEntity.ok(proprieteService.trouverParId(id));
+    }
+
+    @GetMapping("/{id}/geometrie")
+    @Operation(summary = "Géométrie de la propriété (point d'ancrage PostGIS → GeoJSON)")
+    public ResponseEntity<List<Map<String, Object>>> geometrie(@PathVariable Integer id) {
+        return ResponseEntity.ok(proprieteService.geometrie(id));
     }
 
     @PostMapping

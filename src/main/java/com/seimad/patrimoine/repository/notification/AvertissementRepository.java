@@ -29,12 +29,12 @@ public interface AvertissementRepository extends JpaRepository<Avertissement, UU
            "LOWER(a.mission) LIKE LOWER(CONCAT('%',:search,'%')))")
     Page<Avertissement> search(@Param("search") String search, Pageable pageable);
 
-    /** Doublons d'import potentiels : même titre, même parcelle, même date et même personne. */
-    @Query("SELECT a FROM Avertissement a WHERE a.propriete.idPropriete = :tf " +
+    /** Doublons d'import potentiels : même propriété, même parcelle, même date et même personne. */
+    @Query("SELECT a FROM Avertissement a WHERE a.propriete.idPropriete = :idPropriete " +
            "AND a.dateAvertissement = :date AND " +
            "((:parc IS NULL AND a.parcelle IS NULL) OR (:parc IS NOT NULL AND a.parcelle.idParcelle = :parc)) AND " +
            "((:pers IS NULL AND a.personne IS NULL) OR (:pers IS NOT NULL AND a.personne.idPersonne = :pers))")
-       List<Avertissement> trouverDoublons(@Param("tf") Integer idPropriete,
+       List<Avertissement> trouverDoublons(@Param("idPropriete") Integer idPropriete,
                                         @Param("parc") UUID idParcelle,
                                         @Param("date") java.time.LocalDate dateAvertissement,
                                         @Param("pers") Integer idPersonne);

@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 @Repository
@@ -48,4 +49,55 @@ public interface GeometrieRepository extends JpaRepository<Geometrie, UUID> {
             nativeQuery = true)
     int supprimerParEntite(@Param("entiteType") String entiteType,
                            @Param("entiteId") UUID entiteId);
+
+    /**
+     * Point depuis des coordonnées X/Y en grille Laborde (SRID 900914, mètres —
+     * définition enregistrée par la migration V20, cf. sa remarque sur EPSG:29701).
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO geometrie
+                (id_geometrie, entite_type, entite_id, type_geometrie, geom,
+                 precision_m, source, date_creation, date_modification, id_utilisateur)
+            VALUES
+                (gen_random_uuid(), :entiteType, :entiteId, 'Point',
+                 ST_Transform(ST_SetSRID(ST_MakePoint(:xLaborde, :yLaborde), 900914), 4326)::geography,
+                 50, :source, now(), now(), :idUtilisateur)
+            ON CONFLICT (entite_type, entite_id) DO UPDATE SET
+                geom          = EXCLUDED.geom,
+                source        = EXCLUDED.source,
+                date_modification = now()
+            """, nativeQuery = true)
+    int upsertPointLaborde(@Param("entiteType") String entiteType,
+                           @Param("entiteId") UUID entiteId,
+                           @Param("xLaborde") double xLaborde,
+                           @Param("yLaborde") double yLaborde,
+                           @Param("source") String source,
+                           @Param("idUtilisateur") Integer idUtilisateur);
+
+    /** Vérifie que le SRID Laborde (900914, migration V20) est connu de la base. */
+    @Query(value = "SELECT COUNT(*) > 0 FROM spatial_ref_sys WHERE srid = 900914", nativeQuery = true)
+    boolean sridLabordeDisponible();
+
+    /**
+     * Lecture d'une géométrie par entité — renvoie le GeoJSON régénéré depuis
+     * PostGIS (ST_AsGeoJSON) avec les métadonnées (précision, source, dates).
+     * UNIQUE(entite_type, entite_id) → au plus une ligne.
+     */
+    @Query(value = """
+            SELECT id_geometrie::text        AS idGeometrie,
+                   entite_type               AS entiteType,
+                   entite_id::text           AS entiteId,
+                   type_geometrie            AS typeGeometrie,
+                   ST_AsGeoJSON(geom::geometry) AS geojson,
+                   precision_m               AS precisionM,
+                   superficie_calculee_m2    AS superficieCalculeeM2,
+                   source                    AS source,
+                   date_creation             AS dateCreation,
+                   date_modification         AS dateModification
+            FROM geometrie
+            WHERE entite_type = :entiteType AND entite_id = :entiteId
+            """, nativeQuery = true)
+    java.util.List<Map<String, Object>> projeterParEntite(@Param("entiteType") String entiteType,
+                                                          @Param("entiteId") UUID entiteId);
 }

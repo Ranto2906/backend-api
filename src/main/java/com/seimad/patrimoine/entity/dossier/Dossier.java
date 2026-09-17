@@ -60,6 +60,14 @@ public class Dossier {
     private StatutDossier statutDossier;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_type_dossier")
+    private TypeDossier typeDossier;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_dossier_fournie")
+    private DossierFournie dossierFournie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_ville", nullable = false)
     private Ville ville;
 }

@@ -18,6 +18,10 @@ public class ParcelleDTO {
     private String observation;
     private Integer idPropriete;
     private String numeroPropriete;
+    private String nomPropriete;
+    private String zonePropriete;
+    private String localisationPropriete;
+    private String nomVille;
     private String createdAt;
     private String updatedAt;
 }

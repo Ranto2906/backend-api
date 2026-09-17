@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.controller.importation;
 
+import com.seimad.patrimoine.service.dossier.SituationDemandesImportService;
 import com.seimad.patrimoine.service.notification.ExcelImportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,11 +24,26 @@ import java.util.Map;
 public class ImportController {
 
     private final ExcelImportService excelImportService;
+    private final SituationDemandesImportService situationDemandesImportService;
+
+    @PostMapping("/situation-demandes")
+    @Operation(summary = "Importer le fichier Excel « Situation des demandes Patrimoines »",
+            description = "Feuille « Prix au m² » : prix TTC/HT par ville. Une feuille par ville : "
+                    + "dossiers + demandeurs + propriétés + parcelles demandées. "
+                    + "Import idempotent (dossiers reconnus par numéro + ville).")
+    public ResponseEntity<Map<String, Object>> importerSituationDemandes(
+            @RequestParam("file") MultipartFile fichier) throws IOException {
+        if (fichier == null || fichier.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("erreur", "Aucun fichier reçu"));
+        }
+        Map<String, Object> resume = situationDemandesImportService.importer(fichier);
+        return ResponseEntity.ok(resume);
+    }
 
     @PostMapping("/excel")
     @Operation(summary = "Importer le fichier Excel « Suivi des notifications Patrimoine foncier »",
             description = "Feuille 1 : notifications d'occupation (+ suivis). Feuille 2 : avertissements. "
-                    + "Les référentiels (propriété, titre foncier, parcelle) et les personnes sont créés si absents.")
+                    + "Les référentiels (propriété, parcelle) et les personnes sont créés si absents.")
     public ResponseEntity<Map<String, Object>> importerExcel(
             @RequestParam("file") MultipartFile fichier) throws IOException {
         if (fichier == null || fichier.isEmpty()) {

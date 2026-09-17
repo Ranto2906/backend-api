@@ -388,8 +388,6 @@ CREATE TABLE avertissement(
 CREATE TABLE dossier_parcelle(
    id_dossier_parcelle INT GENERATED ALWAYS AS IDENTITY,
    superficie_m2 DECIMAL(12,3),
-   valeur_demande_ttc DECIMAL(16,2),
-   valeur_demande_ht DECIMAL(16,2),
    observation TEXT,
    date_ajout DATETIME DEFAULT CURRENT_TIMESTAMP,
    coordonnee_x DECIMAL(12,3),

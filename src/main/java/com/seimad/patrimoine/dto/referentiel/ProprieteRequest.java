@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.dto.referentiel;
 
+import com.seimad.patrimoine.dto.carte.GeometrieRequest;
 import java.math.BigDecimal;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -25,4 +26,7 @@ public class ProprieteRequest {
 
     @NotNull(message = "La ville est obligatoire")
     private Integer idVille;
+
+    /** Géométrie de la propriété (optionnelle) — point d'ancrage dans la table `geometrie`. */
+    private GeometrieRequest geometrie;
 }
