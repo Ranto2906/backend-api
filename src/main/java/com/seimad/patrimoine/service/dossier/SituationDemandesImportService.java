@@ -3,20 +3,24 @@ package com.seimad.patrimoine.service.dossier;
 import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.dossier.Dossier;
 import com.seimad.patrimoine.entity.dossier.DossierDemandeur;
+import com.seimad.patrimoine.entity.dossier.DossierFournie;
 import com.seimad.patrimoine.entity.dossier.DossierParcelle;
 import com.seimad.patrimoine.entity.dossier.StatutDossier;
 import com.seimad.patrimoine.entity.notification.Personne;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
 import com.seimad.patrimoine.entity.referentiel.Propriete;
+import com.seimad.patrimoine.entity.referentiel.Lieu;
 import com.seimad.patrimoine.entity.referentiel.Ville;
 import com.seimad.patrimoine.repository.carte.GeometrieRepository;
 import com.seimad.patrimoine.repository.dossier.DossierDemandeurRepository;
 import com.seimad.patrimoine.repository.dossier.DossierParcelleRepository;
 import com.seimad.patrimoine.repository.dossier.DossierRepository;
+import com.seimad.patrimoine.repository.dossier.DossierFournieRepository;
 import com.seimad.patrimoine.repository.dossier.StatutDossierRepository;
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
 import com.seimad.patrimoine.repository.referentiel.PrixM2Repository;
 import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
+import com.seimad.patrimoine.repository.referentiel.LieuRepository;
 import com.seimad.patrimoine.repository.referentiel.VilleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,10 +61,16 @@ import java.util.UUID;
  *       importée dans {@code prix_m2} (historique conservé) ;</li>
  *   <li>une feuille par ville : les colonnes sont <b>détectées via la ligne
  *       d'en-têtes</b> (N° Dossier, Date, Année, Demandeur, Contact, Propriété,
- *       TN°, Lieu, Coordonnée X/Y, Superficie, Valeur TTC — l'ordre et la
- *       présence du « Lieu » peuvent varier d'une feuille à l'autre) ;
- *       chaque ligne crée (ou met à jour) un dossier avec son demandeur,
- *       sa propriété et sa parcelle demandée ;</li>
+ *       TN°, Lieu, Coordonnée X/Y, Superficie, Valeur TTC, Observation,
+ *       Dossier fournie — l'ordre et la présence de certaines colonnes
+ *       peuvent varier d'une feuille à l'autre) ; chaque ligne crée (ou met
+ *       à jour) un dossier avec son demandeur, sa propriété et sa parcelle ;</li>
+ *   <li>le <b>numéro de dossier</b> est repris tel quel (sans préfixe), seule
+ *       la <b>date</b> est importée (pas l'Année), l'<b>observation</b> alimente
+ *       {@code dossier.observation}, la colonne <b>Dossier fournie</b> est
+ *       rattachée via le référentiel {@code dossier_fournie} (créé au besoin)
+ *       et le <b>Lieu</b> est rattaché à la <b>province</b> de la feuille dans
+ *       {@code lieu} ;</li>
  *   <li>les <b>coordonnées X/Y Laborde</b> sont enregistrées dans la table
  *       {@code geometrie} rattachée à la propriété (entite_type = « propriete »),
  *       converties en WGS84 côté PostGIS (ST_Transform depuis EPSG:29701) ;</li>
@@ -79,9 +89,11 @@ public class SituationDemandesImportService {
     private final VilleRepository villeRepository;
     private final PrixM2Repository prixM2Repository;
     private final DossierRepository dossierRepository;
+    private final DossierFournieRepository dossierFournieRepository;
     private final StatutDossierRepository statutDossierRepository;
     private final PersonneRepository personneRepository;
     private final ProprieteRepository proprieteRepository;
+    private final LieuRepository lieuRepository;
     private final com.seimad.patrimoine.repository.referentiel.ParcelleRepository parcelleRepository;
     private final DossierParcelleRepository dossierParcelleRepository;
     private final DossierDemandeurRepository dossierDemandeurRepository;
@@ -99,9 +111,11 @@ public class SituationDemandesImportService {
             VilleRepository villeRepository,
             PrixM2Repository prixM2Repository,
             DossierRepository dossierRepository,
+            DossierFournieRepository dossierFournieRepository,
             StatutDossierRepository statutDossierRepository,
             PersonneRepository personneRepository,
             ProprieteRepository proprieteRepository,
+            LieuRepository lieuRepository,
             com.seimad.patrimoine.repository.referentiel.ParcelleRepository parcelleRepository,
             DossierParcelleRepository dossierParcelleRepository,
             DossierDemandeurRepository dossierDemandeurRepository,
@@ -111,9 +125,11 @@ public class SituationDemandesImportService {
         this.villeRepository = villeRepository;
         this.prixM2Repository = prixM2Repository;
         this.dossierRepository = dossierRepository;
+        this.dossierFournieRepository = dossierFournieRepository;
         this.statutDossierRepository = statutDossierRepository;
         this.personneRepository = personneRepository;
         this.proprieteRepository = proprieteRepository;
+        this.lieuRepository = lieuRepository;
         this.parcelleRepository = parcelleRepository;
         this.dossierParcelleRepository = dossierParcelleRepository;
         this.dossierDemandeurRepository = dossierDemandeurRepository;
@@ -132,7 +148,11 @@ public class SituationDemandesImportService {
         int dossiersImportes;
         int dossiersMisAJour;
         int parcellesLiees;
+        int lieuxImportes;
+        int dossiersFournisImportes;
         int geometriesCreees;
+        /** Cache (idVille, libellé minuscule) → Lieu, pour éviter les requêtes répétées. */
+        final Map<String, Lieu> lieuxCache = new HashMap<>();
         int personnesReutilisees;
         int proprietesReutilisees;
     }
@@ -175,6 +195,8 @@ public class SituationDemandesImportService {
         resume.put("dossiersImportes", ctx.dossiersImportes);
         resume.put("dossiersMisAJour", ctx.dossiersMisAJour);
         resume.put("parcellesLiees", ctx.parcellesLiees);
+        resume.put("lieuxImportes", ctx.lieuxImportes);
+        resume.put("dossiersFournisImportes", ctx.dossiersFournisImportes);
         resume.put("geometriesCreees", ctx.geometriesCreees);
         resume.put("personnesReutilisees", ctx.personnesReutilisees);
         resume.put("proprietesReutilisees", ctx.proprietesReutilisees);
@@ -261,7 +283,7 @@ public class SituationDemandesImportService {
         for (int i = 1; i <= sheet.getLastRowNum(); i++) {
             Row row = sheet.getRow(i);
             if (row == null) continue;
-            String numero = texteCellule(row.getCell(colonnes.get("dossier")));
+            String numero = texteCellule(row.getCell(colonnes.get("dossier"))).trim();
             if (numero.isBlank() || "0".equals(numero)) continue;
 
             // ── Chaque ligne = une transaction isolée ──
@@ -285,26 +307,27 @@ public class SituationDemandesImportService {
         String contact = champ(row, c, "contact");
         String nomPropriete = champ(row, c, "propriete");
         String tn = champ(row, c, "tn");
-        String lieu = champ(row, c, "lieu");
+        // Lieu brut (les retours à la ligne du fichier deviennent « / » comme dans le référentiel)
+        String lieu = normaliserLieu(c.containsKey("lieu")
+                ? texteCellule(row.getCell(c.get("lieu"))) : "");
         BigDecimal superficie = c.containsKey("superficie") ? nombre(row, c.get("superficie")) : null;
         BigDecimal valeurTtc = c.containsKey("valeur") ? nombre(row, c.get("valeur")) : null;
         BigDecimal coordX = c.containsKey("x") ? nombre(row, c.get("x")) : null;
         BigDecimal coordY = c.containsKey("y") ? nombre(row, c.get("y")) : null;
         LocalDate date = c.containsKey("date") ? date(row, c.get("date")) : null;
-        Integer annee = c.containsKey("annee") ? entier(row, c.get("annee")) : null;
-        if (annee == null && date != null) annee = date.getYear();
+        String observation = c.containsKey("observation")
+                ? texteCellule(row.getCell(c.get("observation"))) : "";
+        String dossierFournie = champ(row, c, "fournie");
 
         // ── Idempotence : dossier déjà importé ? ──
-        String numeroRecherche = numeroDossierImport(numero, ville);
-        Dossier dossier = dossierRepository.findByNumeroDossier(numeroRecherche).orElse(null);
+        String numeroRecherche = numeroImporte(numero);
+        Dossier dossier = dossierRepository.findFirstByNumeroDossierOrderByDateCreationDesc(numeroRecherche).orElse(null);
         boolean creation = (dossier == null);
         if (creation) {
             dossier = Dossier.builder()
                     .numeroDossier(numeroRecherche)
                     .dateDemande(date)
-                    .annee(annee)
-                    .observation("Importé depuis le fichier Excel « Situation des demandes Patrimoines »"
-                            + (lieu.isBlank() ? "" : " — Lieu : " + lieu))
+                    .observation(observation.isBlank() ? null : observation)
                     .montantTotal(BigDecimal.ZERO)
                     .statutDossier(statutDefaut)
                     .ville(ville)
@@ -313,12 +336,11 @@ public class SituationDemandesImportService {
         } else {
             // Complète les champs manquants lors d'un ré-import
             if (dossier.getDateDemande() == null) dossier.setDateDemande(date);
-            if (dossier.getAnnee() == null) dossier.setAnnee(annee);
         }
 
         // ── Demandeur ──
         if (!demandeurNom.isBlank()) {
-            Personne personne = personneRepository.findByNomIgnoreCase(demandeurNom)
+            Personne personne = personneRepository.findFirstByNomIgnoreCase(demandeurNom)
                     .orElseGet(() -> personneRepository.save(Personne.builder()
                             .nom(tronquer(demandeurNom, 200))
                             .contact(contact.isBlank() ? null : tronquer(contact, 100))
@@ -336,14 +358,27 @@ public class SituationDemandesImportService {
             }
         }
 
+        // ── Dossier fournie (référentiel dossier_fournie, créé au besoin) ──
+        if (!dossierFournie.isBlank()) {
+            dossier.setDossierFournie(dossierFournieRepository.findByLibelleIgnoreCase(dossierFournie)
+                    .orElseGet(() -> dossierFournieRepository.save(
+                            DossierFournie.builder().libelle(tronquer(dossierFournie, 100)).build())));
+            ctx.dossiersFournisImportes++;
+        }
+
+        // ── Lieu : colonne « Lieu » de la feuille, rattaché à la province ──
+        Lieu lieuEntite = lieu.isBlank() ? null : lieuParOuCreer(ville, normaliserLieu(lieu), ctx);
+
         // ── Propriété (nom + TN°) ──
         if (!nomPropriete.isBlank()) {
-            Propriete propriete = proprieteRepository.findByNomIgnoreCase(nomPropriete)
+                Lieu lieuPropriete = (lieuEntite != null) ? lieuEntite
+                        : lieuParOuCreer(ville, ville.getNomVille(), ctx);
+                Propriete propriete = proprieteRepository.findFirstByNomIgnoreCase(nomPropriete)
                     .orElseGet(() -> proprieteRepository.save(Propriete.builder()
                             .nom(tronquer(nomPropriete, 200))
                             .numero(tn.isBlank() ? null : tronquer(tn, 50))
                             .localisation(lieu.isBlank() ? null : lieu)
-                            .ville(ville)
+                            .lieu(lieuPropriete)
                             .build()));
 
             // ── Parcelle (N° de lot si présent dans le fichier, ex. feuille Anosiala) ──
@@ -370,7 +405,7 @@ public class SituationDemandesImportService {
                         .propriete(propriete)
                         .parcelle(parcelle)
                         .superficieM2(superficie)
-                        .observation("Import Excel" + (lieu.isBlank() ? "" : " — " + lieu))
+                        .observation("Import Excel" + (lieuEntite != null ? " — " + lieuEntite.getLibelle() : ""))
                         .build());
                 ctx.parcellesLiees++;
             } else if ((parcelle != null && !parcelle.equals(dp.getParcelle()))
@@ -436,7 +471,7 @@ public class SituationDemandesImportService {
      * layouts variables : « N° Lot » en tête sur Anosiala, absence du « Lieu »
      * sur Fianarantsoa/Manakara/Antsiranana, etc.). Clés renvoyées :
      * dossier, date, annee, demandeur, contact, propriete, tn, lieu, x, y,
-     * superficie, valeur.
+     * superficie, valeur, observation, fournie.
      */
     private Map<String, Integer> mapperColonnes(Row header) {
         if (header == null) return null;
@@ -461,6 +496,8 @@ public class SituationDemandesImportService {
             else if (h.contains("superficie") && !m.containsKey("superficie")) m.put("superficie", idx);
             else if ((h.contains("valeur") || h.contains("montant")) && !m.containsKey("valeur"))
                 m.put("valeur", idx);
+            else if (h.contains("observation") && !m.containsKey("observation")) m.put("observation", idx);
+            else if (h.contains("fournie") && !m.containsKey("fournie")) m.put("fournie", idx);
         }
         return m;
     }
@@ -477,15 +514,50 @@ public class SituationDemandesImportService {
     // Helpers
     // ════════════════════════════════════════════════════════════
 
-    /** Numéro de dossier d'import : préfixe « IMP-ville- » (colonne limitée à 30 caractères). */
-    private String numeroDossierImport(String numero, Ville ville) {
-        String prefixe = "IMP-" + normaliser(ville.getNomVille()) + "-";
-        int maxNumero = 30 - prefixe.length();
-        String num = numero.trim();
-        if (num.length() > maxNumero) {
-            num = num.substring(0, Math.max(1, maxNumero));
+    /** Numéro de dossier repris tel quel du fichier, tronqué à la taille de la colonne (30). */
+    private String numeroImporte(String numero) {
+        return tronquer(numero.trim(), 30);
+    }
+
+    /**
+     * Lieu par libellé dans la province (ville) de la feuille ; créé s'il manque.
+     * Résultats mis en cache : la même feuille répète très souvent le même lieu.
+     */
+    private Lieu lieuParOuCreer(Ville ville, String libelle, Ctx ctx) {
+        String cle = ville.getIdVille() + "\u0000" + libelle.toLowerCase();
+        return ctx.lieuxCache.computeIfAbsent(cle, k ->
+                lieuRepository.findByVilleIdVilleAndLibelleIgnoreCase(ville.getIdVille(), libelle)
+                        .orElseGet(() -> {
+                            // Feuille « Autre » : le lieu identifie lui-même la province
+                            // (Farafangana → Fianarantsoa, Vatomandry → Toamasina, …)
+                            if ("autre".equalsIgnoreCase(ville.getNomVille())) {
+                                List<Lieu> globaux = lieuRepository.findByLibelleIgnoreCase(libelle);
+                                if (!globaux.isEmpty()) return globaux.get(0);
+                            }
+                            Lieu cree = lieuRepository.save(Lieu.builder()
+                                    .libelle(libelle)
+                                    .ville(ville)
+                                    .build());
+                            ctx.lieuxImportes++;
+                            return cree;
+                        }));
+    }
+
+    /**
+     * Libellé de lieu normalisé au format du référentiel : chaque ligne de la
+     * cellule est trimmée puis les lignes sont jointes par « / »
+     * (ex. « Ankasina\nAnjezika » → « Ankasina / Anjezika »).
+     */
+    private String normaliserLieu(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String p : s.split("\\r?\\n")) {
+            String t = p.trim();
+            if (t.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(" / ");
+            sb.append(t);
         }
-        return prefixe + num;
+        return sb.toString();
     }
 
     private Ville trouverOuCreerVille(String nomVille) {

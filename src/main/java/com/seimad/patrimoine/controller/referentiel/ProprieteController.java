@@ -38,7 +38,7 @@ public class ProprieteController {
     }
 
     @GetMapping("/ville/{idVille}")
-    @Operation(summary = "Lister les propriétés d'une ville")
+    @Operation(summary = "Lister les propriétés d'une ville via leur lieu")
     public ResponseEntity<List<ProprieteDTO>> listerParVille(@PathVariable Integer idVille) {
         return ResponseEntity.ok(proprieteService.listerParVille(idVille));
     }

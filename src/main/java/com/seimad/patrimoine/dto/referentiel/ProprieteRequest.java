@@ -24,8 +24,8 @@ public class ProprieteRequest {
     private String localisation;
     private BigDecimal superficieTotale;
 
-    @NotNull(message = "La ville est obligatoire")
-    private Integer idVille;
+    @NotNull(message = "Le lieu est obligatoire")
+    private Integer idLieu;
 
     /** Géométrie de la propriété (optionnelle) — point d'ancrage dans la table `geometrie`. */
     private GeometrieRequest geometrie;

@@ -16,6 +16,8 @@ public interface DossierRepository extends JpaRepository<Dossier, Integer> {
 
     Optional<Dossier> findByNumeroDossier(String numeroDossier);
 
+    Optional<Dossier> findFirstByNumeroDossierOrderByDateCreationDesc(String numeroDossier);
+
     boolean existsByNumeroDossier(String numeroDossier);
 
     /**

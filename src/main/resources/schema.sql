@@ -188,6 +188,17 @@ CREATE TABLE etape(
    UNIQUE(ordre)
 );
 
+CREATE TABLE type_dossier(
+   id_type_dossier INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+   code VARCHAR(30) NOT NULL UNIQUE,
+   libelle VARCHAR(150) NOT NULL
+);
+
+CREATE TABLE dossier_fournie(
+   id_dossier_fournie INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+   libelle VARCHAR(100) NOT NULL UNIQUE
+);
+
 CREATE TABLE dossier(
    id_dossier INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
    numero_dossier VARCHAR(30) NOT NULL,
@@ -400,7 +411,7 @@ CREATE TABLE geometrie(
    precision_m DECIMAL(8,2),                  -- précision GPS si source mobile
    superficie_calculee_m2 DECIMAL(12,3),
    source VARCHAR(30) DEFAULT 'Tracé manuel'
-      CHECK(source IN('Tracé manuel','Import GPS','Calculé automatiquement','Point carte','Recherche de lieu')),
+      CHECK(source IN('Tracé manuel','Import GPS','Calculé automatiquement','Point carte','Recherche de lieu','Import Excel')),
    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    date_modification TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    id_utilisateur INT NOT NULL REFERENCES utilisateur(id_utilisateur),

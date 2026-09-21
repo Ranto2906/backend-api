@@ -5,11 +5,11 @@ import com.seimad.patrimoine.dto.referentiel.ProprieteDTO;
 import com.seimad.patrimoine.dto.referentiel.ProprieteRequest;
 import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.referentiel.Propriete;
-import com.seimad.patrimoine.entity.referentiel.Ville;
+import com.seimad.patrimoine.entity.referentiel.Lieu;
 import com.seimad.patrimoine.repository.auth.UtilisateurRepository;
 import com.seimad.patrimoine.repository.carte.GeometrieRepository;
 import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
-import com.seimad.patrimoine.repository.referentiel.VilleRepository;
+import com.seimad.patrimoine.repository.referentiel.LieuRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 public class ProprieteService {
 
     private final ProprieteRepository proprieteRepository;
-    private final VilleRepository villeRepository;
+    private final LieuRepository lieuRepository;
     private final GeometrieRepository geometrieRepository;
     private final UtilisateurRepository utilisateurRepository;
 
@@ -48,7 +48,7 @@ public class ProprieteService {
 
     @Transactional(readOnly = true)
     public List<ProprieteDTO> listerParVille(Integer idVille) {
-        return proprieteRepository.findByVilleIdVille(idVille).stream().map(this::toDTO).collect(Collectors.toList());
+        return proprieteRepository.findByLieuVilleIdVille(idVille).stream().map(this::toDTO).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -60,15 +60,15 @@ public class ProprieteService {
 
     @Transactional
     public ProprieteDTO creer(ProprieteRequest request) {
-        Ville ville = villeRepository.findById(request.getIdVille())
-                .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + request.getIdVille()));
+        Lieu lieu = lieuRepository.findById(request.getIdLieu())
+            .orElseThrow(() -> new RuntimeException("Lieu non trouvé avec l'id : " + request.getIdLieu()));
         Propriete propriete = Propriete.builder()
                 .nom(request.getNom())
                 .numero(request.getNumero())
                 .zone(request.getZone())
                 .localisation(request.getLocalisation())
                 .superficieTotale(request.getSuperficieTotale())
-                .ville(ville)
+                .lieu(lieu)
                 .build();
         Propriete saved = proprieteRepository.save(propriete);
         enregistrerGeometrie(request.getGeometrie(), saved.getIdPropriete());
@@ -79,14 +79,14 @@ public class ProprieteService {
     public ProprieteDTO mettreAJour(Integer id, ProprieteRequest request) {
         Propriete propriete = proprieteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Propriété non trouvée avec l'id : " + id));
-        Ville ville = villeRepository.findById(request.getIdVille())
-                .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + request.getIdVille()));
+        Lieu lieu = lieuRepository.findById(request.getIdLieu())
+            .orElseThrow(() -> new RuntimeException("Lieu non trouvé avec l'id : " + request.getIdLieu()));
         propriete.setNom(request.getNom());
         propriete.setNumero(request.getNumero());
         propriete.setZone(request.getZone());
         propriete.setLocalisation(request.getLocalisation());
         propriete.setSuperficieTotale(request.getSuperficieTotale());
-        propriete.setVille(ville);
+        propriete.setLieu(lieu);
         propriete.setUpdatedAt(LocalDateTime.now());
         Propriete saved = proprieteRepository.save(propriete);
         enregistrerGeometrie(request.getGeometrie(), saved.getIdPropriete());
@@ -149,8 +149,10 @@ public class ProprieteService {
                 .zone(p.getZone())
                 .localisation(p.getLocalisation())
                 .superficieTotale(p.getSuperficieTotale())
-                .idVille(p.getVille() != null ? p.getVille().getIdVille() : null)
-                .nomVille(p.getVille() != null ? p.getVille().getNomVille() : null)
+                .idLieu(p.getLieu() != null ? p.getLieu().getIdLieu() : null)
+                .libelleLieu(p.getLieu() != null ? p.getLieu().getLibelle() : null)
+                .idVille(p.getLieu() != null && p.getLieu().getVille() != null ? p.getLieu().getVille().getIdVille() : null)
+                .nomVille(p.getLieu() != null && p.getLieu().getVille() != null ? p.getLieu().getVille().getNomVille() : null)
                 .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
                 .updatedAt(p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : null)
                 .build();

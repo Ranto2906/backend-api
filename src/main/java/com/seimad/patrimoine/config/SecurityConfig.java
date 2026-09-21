@@ -79,6 +79,11 @@ public class SecurityConfig {
                 // GET public sur certains endpoints de lecture
                 .requestMatchers(HttpMethod.GET, "/api/villes", "/api/prix-m2").permitAll()
 
+                // Laisser passer le dispatch /error : sans cela, toute requête
+                // sans handler (404) est forwardée vers /error et ressort en 403,
+                // ce qui masque la vraie cause côté client.
+                .requestMatchers("/error").permitAll()
+
                 // Tout le reste nécessite une authentification
                 .anyRequest().authenticated()
             )

@@ -157,8 +157,9 @@ public class DescenteTerrainService {
             map.put("numeroDossier", dp.getDossier() != null ? dp.getDossier().getNumeroDossier() : null);
             map.put("superficie", dp.getSuperficieM2());
             map.put("parcelle", dp.getParcelle() != null ? dp.getParcelle().getNumeroLot() : null);
-            map.put("ville", dp.getPropriete() != null && dp.getPropriete().getVille() != null
-                    ? dp.getPropriete().getVille().getNomVille() : null);
+                map.put("ville", dp.getPropriete() != null && dp.getPropriete().getLieu() != null
+                    && dp.getPropriete().getLieu().getVille() != null
+                    ? dp.getPropriete().getLieu().getVille().getNomVille() : null);
             map.put("propriete", dp.getPropriete() != null ? dp.getPropriete().getNumero() : null);
 
             try {

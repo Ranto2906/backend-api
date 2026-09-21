@@ -23,7 +23,8 @@ public interface DossierParcelleRepository extends JpaRepository<DossierParcelle
            "LEFT JOIN FETCH dp.dossier dos " +
            "LEFT JOIN FETCH dp.propriete prop " +
            "LEFT JOIN FETCH dp.parcelle parc " +
-           "LEFT JOIN FETCH dp.propriete.ville v " +
+           "LEFT JOIN FETCH dp.propriete.lieu lieu " +
+           "LEFT JOIN FETCH lieu.ville v " +
            "WHERE (:search IS NULL OR :search = '' OR " +
            "LOWER(dos.numeroDossier) LIKE LOWER(CONCAT('%',:search,'%')) OR " +
            "LOWER(prop.numero) LIKE LOWER(CONCAT('%',:search,'%')) OR " +

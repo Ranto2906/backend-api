@@ -6,8 +6,10 @@ import com.seimad.patrimoine.entity.notification.NotificationPersonne;
 import com.seimad.patrimoine.entity.notification.Personne;
 import com.seimad.patrimoine.entity.notification.Photo;
 import com.seimad.patrimoine.entity.notification.SuiviNotification;
+import com.seimad.patrimoine.entity.referentiel.Lieu;
 import com.seimad.patrimoine.entity.referentiel.Parcelle;
 import com.seimad.patrimoine.entity.referentiel.Propriete;
+import com.seimad.patrimoine.entity.referentiel.Ville;
 import com.seimad.patrimoine.repository.notification.AvertissementRepository;
 import com.seimad.patrimoine.repository.notification.NotificationOccupationRepository;
 import com.seimad.patrimoine.repository.notification.NotificationPersonneRepository;
@@ -15,8 +17,10 @@ import com.seimad.patrimoine.repository.notification.PersonneRepository;
 import com.seimad.patrimoine.repository.notification.PhotoRepository;
 import com.seimad.patrimoine.repository.notification.SuiviNotificationRepository;
 import com.seimad.patrimoine.repository.notification.TypePersonneRepository;
+import com.seimad.patrimoine.repository.referentiel.LieuRepository;
 import com.seimad.patrimoine.repository.referentiel.ParcelleRepository;
 import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
+import com.seimad.patrimoine.repository.referentiel.VilleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -34,7 +38,7 @@ import org.apache.poi.xssf.usermodel.XSSFShape;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -64,6 +68,16 @@ import java.util.regex.Pattern;
  * Les référentiels (propriété, parcelle) et les personnes sont
  * recherchés par leur nom/numéro ; s'ils n'existent pas encore, ils sont créés.
  * <p>
+ * Colonnes « Zone » et « Localisation » du fichier :
+ * <ul>
+ *   <li>la <b>Localisation</b> désigne la <b>ville</b> (ex. « Antananarivo /
+ *       Avaradrano » → ville Antananarivo) : le premier segment reconnu est
+ *       rattaché à la propriété via {@code lieu.ville} ;</li>
+ *   <li>la <b>Zone</b> (quartier : Manazary Ilafy, Ambohipo…) alimente le
+ *       référentiel {@code lieu}, rattaché à cette ville, et la propriété
+ *       est liée à ce lieu ({@code propriete.id_lieu}).</li>
+ * </ul>
+ * <p>
  * Depuis la V9 :
  * <ul>
  *   <li>import <b>idempotent</b> : une notification/avertissement déjà présent
@@ -89,6 +103,9 @@ public class ExcelImportService {
     private final PhotoRepository photoRepository;
     private final ProprieteRepository proprieteRepository;
     private final ParcelleRepository parcelleRepository;
+    private final VilleRepository villeRepository;
+    private final LieuRepository lieuRepository;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${app.stockage-photos:uploads/photos}")
     private String stockagePhotos;
@@ -103,7 +120,7 @@ public class ExcelImportService {
     private static final int S1_TITRE        = 2;
     private static final int S1_PARCELLE     = 3;
     private static final int S1_ZONE         = 4;
-    private static final int S1_LOCALISATION = 5;
+    private static final int S1_LOCALISATION = 5;   // la localisation du fichier = la ville
     private static final int S1_DATE_NOTIF   = 6;
     private static final int S1_ANNEE        = 7;
     private static final int S1_PERSONNE     = 8;
@@ -126,7 +143,7 @@ public class ExcelImportService {
     private static final int S2_TITRE        = 2;
     private static final int S2_PARCELLE     = 3;
     private static final int S2_ZONE         = 4;
-    private static final int S2_LOCALISATION = 5;
+    private static final int S2_LOCALISATION = 5;   // la localisation du fichier = la ville
     private static final int S2_DATE_AVERT   = 6;
     private static final int S2_ANNEE        = 7;
     private static final int S2_PERSONNE     = 8;
@@ -153,8 +170,9 @@ public class ExcelImportService {
 
     /**
      * Importe le fichier Excel et renvoie un résumé des lignes traitées.
+     * Chaque ligne est traitée dans sa propre transaction : une ligne en erreur
+     * est journalisée sans interrompre l'import ni empoisonner la session.
      */
-    @Transactional
     public Map<String, Object> importer(MultipartFile fichier) throws IOException {
         Map<String, Object> resume = new LinkedHashMap<>();
         List<String> erreurs = new ArrayList<>();
@@ -167,21 +185,29 @@ public class ExcelImportService {
         resume.put("suivisCrees", 0);
         resume.put("photosImportees", 0);
         resume.put("lignesIgnorees", 0);
+        resume.put("villesCrees", 0);
+        resume.put("lieuxCrees", 0);
         resume.put("erreurs", erreurs);
 
         // Cache des référentiels/personnes déjà créés ou trouvés pendant l'import
         Map<String, Propriete> proprietesCache = new HashMap<>();
         Map<String, Parcelle> parcellesCache = new HashMap<>();
         Map<String, Personne> personnes = new HashMap<>();
+        // La colonne « Localisation » du fichier désigne la ville ; la colonne
+        // « Zone » alimente le référentiel lieu (rattaché à cette ville).
+        Map<String, Ville> villesCache = new HashMap<>();
+        Map<String, Lieu> lieuxCache = new HashMap<>();
 
         try (InputStream in = fichier.getInputStream();
              Workbook workbook = new XSSFWorkbook(in)) {
 
             if (workbook.getNumberOfSheets() > 0) {
-                importerNotifications(workbook.getSheetAt(0), proprietesCache, parcellesCache, personnes, resume, erreurs);
+                importerNotifications(workbook.getSheetAt(0), proprietesCache, parcellesCache, personnes,
+                        villesCache, lieuxCache, resume, erreurs);
             }
             if (workbook.getNumberOfSheets() > 1) {
-                importerAvertissements(workbook.getSheetAt(1), proprietesCache, parcellesCache, personnes, resume, erreurs);
+                importerAvertissements(workbook.getSheetAt(1), proprietesCache, parcellesCache, personnes,
+                        villesCache, lieuxCache, resume, erreurs);
             }
         }
 
@@ -196,11 +222,12 @@ public class ExcelImportService {
                                        Map<String, Propriete> proprietesCache,
                                        Map<String, Parcelle> parcellesCache,
                                        Map<String, Personne> personnes,
+                                       Map<String, Ville> villesCache,
+                                       Map<String, Lieu> lieuxCache,
                                        Map<String, Object> resume,
                                        List<String> erreurs) {
         int ligneEnTete = trouverLigneEnTete(feuille, 0, S1_TITRE);
         Map<Integer, CiblesLigne> cibles = new HashMap<>();
-        int nb = 0;
 
         for (int i = ligneEnTete + 1; i <= feuille.getLastRowNum(); i++) {
             Row row = feuille.getRow(i);
@@ -210,15 +237,21 @@ public class ExcelImportService {
             if (numero == null || numero.isEmpty()) continue; // ligne vide
 
             try {
+                final int ligneNo = i + 1;
+                CiblesLigne cibleRow = transactionTemplate.execute(status -> {
+                // Localisation = ville (créée au besoin) ; Zone = lieu rattaché à cette ville
+                Ville ville = villeDeLocalisation(texte(row.getCell(S1_LOCALISATION)), villesCache, resume);
+                Lieu lieu = lieuDeZone(texte(row.getCell(S1_ZONE)), ville, lieuxCache, resume);
+
                 Propriete propriete = obtenirPropriete(
                         texte(row.getCell(S1_TITRE)),
                         texte(row.getCell(S1_PROPRIETE)),
                         texte(row.getCell(S1_ZONE)),
                         texte(row.getCell(S1_LOCALISATION)),
+                        lieu,
                         proprietesCache, resume);
                 if (propriete == null) {
-                    erreurs.add("Ligne " + (i + 1) + " : propriété manquante — ignorée");
-                    continue;
+                    throw new IllegalStateException("propriété manquante — ligne ignorée");
                 }
 
                 Parcelle parcelle = obtenirParcelle(
@@ -243,7 +276,7 @@ public class ExcelImportService {
                     notification = existante;
                     cible.notificationId = existante.getIdNotification();
                     resume.put("lignesIgnorees", (int) resume.get("lignesIgnorees") + 1);
-                    log.info("Import notification — ligne {} : doublon ignoré (notification existante)", i + 1);
+                    log.info("Import notification — ligne {} : doublon ignoré (notification existante)", ligneNo);
                 } else {
                     // Création réelle (personne créée si inconnue)
                     if (personne == null) {
@@ -267,7 +300,7 @@ public class ExcelImportService {
                             .build();
                     notificationRepository.save(notification);
                     cible.notificationId = notification.getIdNotification();
-                    nb++;
+                    resume.put("notificationsImportees", (int) resume.get("notificationsImportees") + 1);
 
                     if (personne != null) {
                         notificationPersonneRepository.save(NotificationPersonne.builder()
@@ -316,18 +349,23 @@ public class ExcelImportService {
                     ordre++;
                 }
 
-                cibles.put(i + 1, cible);
+                return cible;
+                });
+
+                if (cibleRow != null) {
+                    cibles.put(i + 1, cibleRow);
+                }
             } catch (Exception e) {
-                log.warn("Import notification — erreur ligne {} : {}", i + 1, e.getMessage());
-                erreurs.add("Ligne " + (i + 1) + " : " + e.getMessage());
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                log.warn("Import notification — erreur ligne {} : {}", i + 1, cause.getMessage());
+                erreurs.add("Ligne " + (i + 1) + " : " + cause.getMessage());
             }
         }
 
         // 5) Photos embarquées de la feuille
         importerPhotosNotifications(feuille, cibles, resume, erreurs);
 
-        resume.put("notificationsImportees", nb);
-        log.info("Import notifications : {} nouvelles lignes importées", nb);
+        log.info("Import notifications : {} nouvelles lignes importées", resume.get("notificationsImportees"));
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -338,12 +376,13 @@ public class ExcelImportService {
                                         Map<String, Propriete> proprietesCache,
                                         Map<String, Parcelle> parcellesCache,
                                         Map<String, Personne> personnes,
+                                        Map<String, Ville> villesCache,
+                                        Map<String, Lieu> lieuxCache,
                                         Map<String, Object> resume,
                                         List<String> erreurs) {
         // La feuille commence par 2 lignes d'explication puis la ligne d'en-tête
         int ligneEnTete = trouverLigneEnTete(feuille, 0, S2_TITRE);
         Map<Integer, UUID> avertissementsParLigne = new HashMap<>();
-        int nb = 0;
 
         for (int i = ligneEnTete + 1; i <= feuille.getLastRowNum(); i++) {
             Row row = feuille.getRow(i);
@@ -353,15 +392,21 @@ public class ExcelImportService {
             if (numero == null || numero.isEmpty()) continue; // ligne vide
 
             try {
+                final int ligneNo = i + 1;
+                transactionTemplate.execute(status -> {
+                // Localisation = ville (créée au besoin) ; Zone = lieu rattaché à cette ville
+                Ville ville = villeDeLocalisation(texte(row.getCell(S2_LOCALISATION)), villesCache, resume);
+                Lieu lieu = lieuDeZone(texte(row.getCell(S2_ZONE)), ville, lieuxCache, resume);
+
                 Propriete propriete = obtenirPropriete(
                         texte(row.getCell(S2_TITRE)),
                         texte(row.getCell(S2_PROPRIETE)),
                         texte(row.getCell(S2_ZONE)),
                         texte(row.getCell(S2_LOCALISATION)),
+                        lieu,
                         proprietesCache, resume);
                 if (propriete == null) {
-                    erreurs.add("Ligne " + (i + 1) + " : propriété manquante — ignorée");
-                    continue;
+                    throw new IllegalStateException("propriété manquante — ligne ignorée");
                 }
 
                 Parcelle parcelle = obtenirParcelle(
@@ -379,7 +424,7 @@ public class ExcelImportService {
                 if (existant != null) {
                     avertissement = existant;
                     resume.put("lignesIgnorees", (int) resume.get("lignesIgnorees") + 1);
-                    log.info("Import avertissement — ligne {} : doublon ignoré", i + 1);
+                    log.info("Import avertissement — ligne {} : doublon ignoré", ligneNo);
                 } else {
                     if (personne == null) {
                         personne = creerPersonne(nomPersonne, null, ROLE_AVERTI, personnes, resume);
@@ -401,19 +446,21 @@ public class ExcelImportService {
                             .parcelle(parcelle)
                             .build();
                     avertissementRepository.save(avertissement);
-                    nb++;
+                    resume.put("avertissementsImportes", (int) resume.get("avertissementsImportes") + 1);
                 }
-                avertissementsParLigne.put(i + 1, avertissement.getIdAvertissement());
+                avertissementsParLigne.put(ligneNo, avertissement.getIdAvertissement());
+                return null;
+                });
             } catch (Exception e) {
-                log.warn("Import avertissement — erreur ligne {} : {}", i + 1, e.getMessage());
-                erreurs.add("Ligne " + (i + 1) + " : " + e.getMessage());
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                log.warn("Import avertissement — erreur ligne {} : {}", i + 1, cause.getMessage());
+                erreurs.add("Ligne " + (i + 1) + " : " + cause.getMessage());
             }
         }
 
         importerPhotosAvertissements(feuille, avertissementsParLigne, resume, erreurs);
 
-        resume.put("avertissementsImportes", nb);
-        log.info("Import avertissements : {} nouvelles lignes importées", nb);
+        log.info("Import avertissements : {} nouvelles lignes importées", resume.get("avertissementsImportes"));
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -540,33 +587,151 @@ public class ExcelImportService {
     // Référentiels & personnes (avec cache)
     // ─────────────────────────────────────────────────────────────
 
+    /**
+     * Propriété identifiée par son numéro (clé du fichier) ; créée si absente.
+     * Anciennes versions du fichier sans numéro : dédoublonnage par nom.
+     * `nom` étant unique en base, un repli « Propriété n° X » est appliqué
+     * lorsque le titre est absent, et le numéro est ajouté au nom en cas de
+     * conflit avec une propriété existante portant le même titre.
+     */
     private Propriete obtenirPropriete(String numero,
-                                             String nomPropriete,
-                                             String zone,
-                                             String localisation,
-                                             Map<String, Propriete> proprietesCache,
-                                             Map<String, Object> resume) {
+                                       String nomPropriete,
+                                       String zone,
+                                       String localisation,
+                                       Lieu lieu,
+                                       Map<String, Propriete> proprietesCache,
+                                       Map<String, Object> resume) {
         String numeroClean = nettoyer(numero);
-        if (numeroClean == null) return null;
+        String nomClean = nettoyer(nomPropriete);
+        if (numeroClean == null && nomClean == null) return null;
 
-        Propriete propriete = proprietesCache.get(numeroClean);
-        if (propriete == null) {
+        String cle = numeroClean != null ? "N|" + numeroClean : "T|" + nomClean.toLowerCase();
+        Propriete propriete = proprietesCache.get(cle);
+        if (propriete == null && numeroClean != null) {
             propriete = proprieteRepository.findByNumero(numeroClean).orElse(null);
         }
+        if (propriete == null && numeroClean == null) {
+            propriete = proprieteRepository.findByNomIgnoreCase(nomClean).orElse(null);
+        }
         if (propriete == null) {
-                propriete = Propriete.builder()
-                    .nom(nettoyer(nomPropriete))
+            String nom = nomClean;
+            if (nom == null) {
+                nom = "Propriété n° " + numeroClean;
+            } else if (numeroClean != null && proprieteRepository.findByNomIgnoreCase(nom)
+                    .filter(p -> !numeroClean.equals(p.getNumero())).isPresent()) {
+                // Même titre pour un autre numéro : on rend le nom unique
+                nom = nom + " n° " + numeroClean;
+            }
+            propriete = Propriete.builder()
+                    .nom(nom)
                     .numero(numeroClean)
                     .zone(nettoyer(zone))
                     .localisation(nettoyer(localisation))
+                    .lieu(lieu)
                     .build();
             proprieteRepository.save(propriete);
-            proprietesCache.put(numeroClean, propriete);
             resume.put("proprietesCrees", (int) resume.get("proprietesCrees") + 1);
-            return propriete;
+        } else if (lieu != null && propriete.getLieu() == null) {
+            // Ré-import : complète le lieu d'une propriété créée avant la
+            // mise en place du rattachement lieu (idempotent).
+            propriete.setLieu(lieu);
+            proprieteRepository.save(propriete);
         }
-        proprietesCache.put(numeroClean, propriete);
+        proprietesCache.put(cle, propriete);
         return propriete;
+    }
+
+    /**
+     * Ville déduite de la colonne « Localisation » du fichier (ex.
+     * « Antananarivo / Avaradrano » → Antananarivo). Le premier segment est
+     * reconnu contre le référentiel ville (insensible à la casse/accents) ;
+     * créé s'il est inconnu. Cache par clé normalisée.
+     */
+    private Ville villeDeLocalisation(String localisation,
+                                      Map<String, Ville> villesCache,
+                                      Map<String, Object> resume) {
+        String brut = nettoyer(localisation);
+        if (brut == null) return null;
+
+        String candidatInconnu = null;
+        for (String candidat : candidatsVille(brut)) {
+            String cle = normaliserCle(candidat);
+            if (villesCache.containsKey(cle)) return villesCache.get(cle);
+            Optional<Ville> trouvee = villeRepository.findByNomVilleIgnoreCase(candidat);
+            if (trouvee.isPresent()) {
+                villesCache.put(cle, trouvee.get());
+                return trouvee.get();
+            }
+            candidatInconnu = candidatInconnu != null ? candidatInconnu : candidat;
+        }
+        // Aucun segment connu : on crée une ville à partir du premier segment
+        if (candidatInconnu == null) return null;
+        Ville cree = villeRepository.save(Ville.builder()
+                .nomVille(tronquer(candidatInconnu, 100))
+                .build());
+        resume.put("villesCrees", (int) resume.get("villesCrees") + 1);
+        log.info("Import notification — ville « {} » créée depuis la localisation", cree.getNomVille());
+        villesCache.put(normaliserCle(candidatInconnu), cree);
+        return cree;
+    }
+
+    /**
+     * Candidats de nom de ville à partir de la localisation : les segments
+     * séparés par « / » (ex. « Antananarivo / Avaradrano » → Antananarivo,
+     * Avaradrano) puis la chaîne entière.
+     */
+    private List<String> candidatsVille(String localisation) {
+        List<String> candidats = new ArrayList<>();
+        for (String segment : localisation.split("/")) {
+            String s = segment.trim();
+            if (!s.isEmpty()) candidats.add(s);
+        }
+        if (candidats.size() > 1) candidats.add(localisation.trim());
+        return candidats;
+    }
+
+    /**
+     * Lieu (quartier) issu de la colonne « Zone » du fichier, rattaché à la
+     * ville déduite de la localisation ; créé s'il manque. La correspondance
+     * sur le référentiel lieu est insensible à la casse (le lieu peut exister
+     * dans plusieurs villes, la ville cible désambiguïse). Cache par ville+zone.
+     */
+    private Lieu lieuDeZone(String zone, Ville ville,
+                            Map<String, Lieu> lieuxCache,
+                            Map<String, Object> resume) {
+        String libelle = nettoyer(zone);
+        if (libelle == null || ville == null) return null;
+
+        String cle = ville.getIdVille() + "\u0000" + normaliserCle(libelle);
+        Lieu existant = lieuxCache.get(cle);
+        if (existant != null) return existant;
+
+        Lieu lieu = lieuRepository.findByVilleIdVilleAndLibelleIgnoreCase(ville.getIdVille(), libelle)
+                .orElseGet(() -> {
+                    Lieu cree = lieuRepository.save(Lieu.builder()
+                            .libelle(tronquer(libelle, 150))
+                            .ville(ville)
+                            .build());
+                    resume.put("lieuxCrees", (int) resume.get("lieuxCrees") + 1);
+                    log.info("Import notification — lieu « {} » créé (ville : {})", cree.getLibelle(), ville.getNomVille());
+                    return cree;
+                });
+        lieuxCache.put(cle, lieu);
+        return lieu;
+    }
+
+    /** Clé de cache : minuscule, accents retirés, uniquement lettres/chiffres. */
+    private String normaliserCle(String s) {
+        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase()
+                .replaceAll("[^a-z0-9]", "");
+    }
+
+    /** Tronque une chaîne à la taille maximale de la colonne cible. */
+    private String tronquer(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private Parcelle obtenirParcelle(String numeroLot,
@@ -603,7 +768,7 @@ public class ExcelImportService {
 
         Personne personne = personnes.get(nomClean.toLowerCase());
         if (personne == null) {
-            personne = personneRepository.findByNomIgnoreCase(nomClean).orElse(null);
+            personne = personneRepository.findFirstByNomIgnoreCase(nomClean).orElse(null);
             if (personne != null) personnes.put(nomClean.toLowerCase(), personne);
         }
         return personne;

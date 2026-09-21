@@ -44,6 +44,6 @@ public class Propriete {
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_ville")
-    private Ville ville;
+    @JoinColumn(name = "id_lieu")
+    private Lieu lieu;
 }

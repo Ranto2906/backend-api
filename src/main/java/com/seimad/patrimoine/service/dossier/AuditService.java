@@ -6,12 +6,13 @@ import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.dossier.Audit;
 import com.seimad.patrimoine.repository.dossier.AuditRepository;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -20,38 +21,55 @@ import java.util.Map;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class AuditService {
 
     private final AuditRepository auditRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate auditTransaction;
+
+    public AuditService(AuditRepository auditRepository,
+                        ObjectMapper objectMapper,
+                        PlatformTransactionManager transactionManager) {
+        this.auditRepository = auditRepository;
+        this.objectMapper = objectMapper;
+        // Transaction indépendante (REQUIRES_NEW) : un échec d'audit ne peut
+        // jamais marquer la transaction métier appelante rollback-only.
+        this.auditTransaction = new TransactionTemplate(transactionManager);
+        this.auditTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     // ── Enregistrer une action d'audit ──
 
-    @Transactional
+    /**
+     * Enregistre l'audit dans une transaction indépendante : en cas d'échec
+     * (contrainte non étendue, base indisponible), l'erreur est loguée et
+     * l'opération métier appelante réussit normalement.
+     */
     public void enregistrer(String entiteType, String entiteId, String action,
                             Map<String, Object> anciennesValeurs,
                             Map<String, Object> nouvellesValeurs,
                             Utilisateur utilisateur,
                             HttpServletRequest request) {
         try {
-            Audit audit = Audit.builder()
-                    .entiteType(entiteType)
-                    .entiteId(entiteId)
-                    .action(action)
-                    .anciennesValeurs(anciennesValeurs != null ? objectMapper.writeValueAsString(anciennesValeurs) : null)
-                    .nouvellesValeurs(nouvellesValeurs != null ? objectMapper.writeValueAsString(nouvellesValeurs) : null)
-                    .utilisateur(utilisateur)
-                    .ipAdresse(getClientIp(request))
-                    .build();
-            auditRepository.save(audit);
+            auditTransaction.executeWithoutResult(status -> {
+                Audit audit = Audit.builder()
+                        .entiteType(entiteType)
+                        .entiteId(entiteId)
+                        .action(action)
+                        .anciennesValeurs(anciennesValeurs != null ? writeJson(anciennesValeurs) : null)
+                        .nouvellesValeurs(nouvellesValeurs != null ? writeJson(nouvellesValeurs) : null)
+                        .utilisateur(utilisateur)
+                        .ipAdresse(getClientIp(request))
+                        .build();
+                auditRepository.save(audit);
+            });
         } catch (Exception e) {
-            log.error("Erreur lors de l'enregistrement de l'audit : {}", e.getMessage());
+            log.error("Erreur lors de l'enregistrement de l'audit ({} #{}) : {}",
+                    entiteType, entiteId, e.getMessage());
         }
     }
 
     // Surcharge sans HttpServletRequest (pour les appels internes)
-    @Transactional
     public void enregistrer(String entiteType, String entiteId, String action,
                             Map<String, Object> anciennesValeurs,
                             Map<String, Object> nouvellesValeurs,
@@ -60,11 +78,18 @@ public class AuditService {
     }
 
     // Surcharge sans HttpServletRequest ni Utilisateur (pour les appels RBAC)
-    @Transactional
     public void enregistrer(String entiteType, String entiteId, String action,
                             Map<String, Object> anciennesValeurs,
                             Map<String, Object> nouvellesValeurs) {
         enregistrer(entiteType, entiteId, action, anciennesValeurs, nouvellesValeurs, null, null);
+    }
+
+    private String writeJson(Map<String, Object> valeurs) {
+        try {
+            return objectMapper.writeValueAsString(valeurs);
+        } catch (Exception e) {
+            return String.valueOf(valeurs);
+        }
     }
 
     // ── Lecture ──

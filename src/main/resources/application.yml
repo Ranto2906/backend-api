@@ -7,7 +7,7 @@ spring:
 
   # ── Datasource PostgreSQL ──
   datasource:
-    url: jdbc:postgresql://localhost:5432/gestionpatrimoine
+    url: jdbc:postgresql://localhost:5432/patrimoine
     username: postgres
     password: r
     driver-class-name: org.postgresql.Driver

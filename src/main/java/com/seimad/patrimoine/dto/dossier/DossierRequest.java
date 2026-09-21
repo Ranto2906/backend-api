@@ -47,7 +47,7 @@ public class DossierRequest {
 
     private Integer idTypeDossier;
 
-    private Integer idDossierFournie;
+    private String dossierFournie;
 
     @NotNull(message = "La ville est obligatoire")
     private Integer idVille;

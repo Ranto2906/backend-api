@@ -17,6 +17,8 @@ public class ProprieteDTO {
     private String zone;
     private String localisation;
     private BigDecimal superficieTotale;
+    private Integer idLieu;
+    private String libelleLieu;
     private Integer idVille;
     private String nomVille;
     private String createdAt;

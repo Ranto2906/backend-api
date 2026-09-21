@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.controller.dossier;
 
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.dossier.DossierDTO;
 import com.seimad.patrimoine.dto.dossier.DossierRequest;
 import com.seimad.patrimoine.dto.dossier.EtapeRequest;
@@ -221,6 +222,17 @@ public class DossierController {
     @GetMapping("/{id}/historique")
     public ResponseEntity<List<DossierDTO.SuiviDossierDTO>> historiqueSuivi(@PathVariable Integer id) {
         return ResponseEntity.ok(dossierService.historiqueSuivi(id));
+    }
+
+    // ── GET /api/dossiers/{id}/modifications ──
+    /**
+     * Historique des modifications du dossier : entrées d'audit (création,
+     * mises à jour, changements de statut) triées de la plus récente à la
+     * plus ancienne.
+     */
+    @GetMapping("/{id}/modifications")
+    public ResponseEntity<List<AuditDTO>> historiqueModifications(@PathVariable Integer id) {
+        return ResponseEntity.ok(dossierService.historiqueModifications(id));
     }
 
     // ── GET /api/dossiers/stats ──

@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.service.dossier;
 
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.dossier.DossierDTO;
 import com.seimad.patrimoine.dto.dossier.DossierRequest;
 import com.seimad.patrimoine.dto.dossier.EtapeRequest;
@@ -22,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,7 +83,7 @@ public class DossierService {
     @Transactional(readOnly = true)
     public DossierDTO trouverParId(Integer id) {
         Dossier dossier = dossierRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dossier non trouvé avec l'id : " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dossier non trouvé avec l'id : " + id));
         return toDTO(dossier);
     }
 
@@ -87,6 +91,27 @@ public class DossierService {
     public List<DossierDTO.SuiviDossierDTO> historiqueSuivi(Integer id) {
         return suiviDossierRepository.findByDossierIdDossierOrderByEtapeOrdreAsc(id)
                 .stream().map(this::toSuiviDTO).toList();
+    }
+
+    /**
+     * Historique des modifications du dossier : entrées d'audit (création,
+     * mises à jour, changements de statut) et suivi d'étapes, triées de la
+     * plus récente à la plus ancienne.
+     */
+    @Transactional(readOnly = true)
+    public List<AuditDTO> historiqueModifications(Integer id) {
+        // Vérifie l'existence du dossier (404 clair si absent)
+        dossierRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dossier non trouvé avec l'id : " + id));
+
+        List<AuditDTO> entites = new ArrayList<>();
+        entites.addAll(auditService.historiqueEntite("dossier", id.toString()));
+        entites.addAll(auditService.historiqueEntite("suivi_dossier", id.toString()));
+
+        entites.sort(Comparator.comparing(
+                AuditDTO::getDateAction,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return entites;
     }
 
     // ════════════════════════════════════════════════════════════
@@ -112,9 +137,9 @@ public class DossierService {
                 .montantTotal(request.getMontantTotal() != null ? request.getMontantTotal() : BigDecimal.ZERO)
                 .statutDossier(resoudreStatut(request.getIdStatutDossier()))
                 .typeDossier(resoudreTypeDossier(request.getIdTypeDossier()))
-                .dossierFournie(resoudreDossierFournie(request.getIdDossierFournie()))
+                .dossierFournie(resoudreDossierFournie(request.getDossierFournie()))
                 .ville(villeRepository.findById(request.getIdVille())
-                        .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + request.getIdVille())))
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ville non trouvée avec l'id : " + request.getIdVille())))
                 .build();
 
         Dossier saved = dossierRepository.save(dossier);
@@ -140,7 +165,7 @@ public class DossierService {
     @Transactional
     public DossierDTO mettreAJour(Integer id, DossierRequest request) {
         Dossier dossier = dossierRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dossier non trouvé avec l'id : " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dossier non trouvé avec l'id : " + id));
 
         // Vérification unicité du numéro si modifié
         if (!dossier.getNumeroDossier().equals(request.getNumeroDossier())
@@ -163,9 +188,9 @@ public class DossierService {
             dossier.setStatutDossier(resoudreStatut(request.getIdStatutDossier()));
         }
                 dossier.setTypeDossier(resoudreTypeDossier(request.getIdTypeDossier()));
-                dossier.setDossierFournie(resoudreDossierFournie(request.getIdDossierFournie()));
+                dossier.setDossierFournie(resoudreDossierFournie(request.getDossierFournie()));
         dossier.setVille(villeRepository.findById(request.getIdVille())
-                .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + request.getIdVille())));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ville non trouvée avec l'id : " + request.getIdVille())));
         dossier.setDateModification(LocalDateTime.now());
 
         Dossier saved = dossierRepository.save(dossier);
@@ -190,7 +215,7 @@ public class DossierService {
     @Transactional
     public void supprimer(Integer id) {
         Dossier dossier = dossierRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dossier non trouvé avec l'id : " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dossier non trouvé avec l'id : " + id));
 
         Map<String, Object> anciennes = snapshot(dossier);
 
@@ -518,10 +543,12 @@ public class DossierService {
                                 .orElseThrow(() -> new RuntimeException("Type de dossier non trouvé avec l'id : " + idTypeDossier));
         }
 
-        private DossierFournie resoudreDossierFournie(Integer idDossierFournie) {
-                if (idDossierFournie == null) return null;
-                return dossierFournieRepository.findById(idDossierFournie)
-                                .orElseThrow(() -> new RuntimeException("Dossier fourni non trouvé avec l'id : " + idDossierFournie));
+        private DossierFournie resoudreDossierFournie(String libelle) {
+                if (libelle == null || libelle.isBlank()) return null;
+                String libelleNormalise = libelle.trim();
+                return dossierFournieRepository.findByLibelleIgnoreCase(libelleNormalise)
+                                .orElseGet(() -> dossierFournieRepository.save(
+                                                DossierFournie.builder().libelle(libelleNormalise).build()));
         }
 
     private void enregistrerDemandeurs(Dossier dossier, List<DossierRequest.DemandeurRequest> demandeurs) {
@@ -538,7 +565,7 @@ public class DossierService {
                     throw new RuntimeException("Le nom du demandeur est obligatoire");
                 }
                 // Déduplication : réutilise la personne si elle existe déjà (même nom)
-                personne = personneRepository.findByNomIgnoreCase(dr.getNom().trim())
+                personne = personneRepository.findFirstByNomIgnoreCase(dr.getNom().trim())
                         .orElseGet(() -> {
                             TypePersonne typeDemandeur = typePersonneRepository.findByCode("DEMANDEUR")
                                     .orElse(null);
@@ -558,6 +585,9 @@ public class DossierService {
                 DossierDemandeur dd = DossierDemandeur.builder()
                         .idDossier(dossier.getIdDossier())
                         .idPersonne(personne.getIdPersonne())
+                        // Référence obligatoire : toDTO lit dd.getPersonne() dans
+                        // la même transaction (pas de rechargement depuis la base).
+                        .personne(personne)
                         .role(dr.getRole() != null && !dr.getRole().isBlank() ? dr.getRole() : "Principal")
                         .build();
                 dossierDemandeurRepository.save(dd);
@@ -624,7 +654,12 @@ public class DossierService {
         List<DossierDTO.DemandeurDTO> demandeurs = dossierDemandeurRepository
                 .findByIdDossier(dossier.getIdDossier()).stream()
                 .map(dd -> {
-                    Personne p = dd.getPersonne();
+                    // Entité liée null si la ligne vient d'être créée dans cette
+                    // transaction : recharger depuis la base pour éviter le NPE.
+                    Personne p = dd.getPersonne() != null
+                            ? dd.getPersonne()
+                            : personneRepository.findById(dd.getIdPersonne()).orElse(null);
+                    if (p == null) return null;
                     return DossierDTO.DemandeurDTO.builder()
                             .idPersonne(p.getIdPersonne())
                             .nom(p.getNom())
@@ -636,6 +671,7 @@ public class DossierService {
                             .libelleTypePersonne(p.getTypePersonne() != null ? p.getTypePersonne().getLibelle() : null)
                             .build();
                 })
+                .filter(java.util.Objects::nonNull)
                 .toList();
 
         List<DossierDTO.SuiviDossierDTO> suivi = suiviDossierRepository

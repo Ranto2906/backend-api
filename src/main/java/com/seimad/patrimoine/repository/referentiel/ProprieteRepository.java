@@ -12,9 +12,11 @@ import java.util.Optional;
 @Repository
 public interface ProprieteRepository extends JpaRepository<Propriete, Integer> {
 
-    List<Propriete> findByVilleIdVille(Integer idVille);
+    List<Propriete> findByLieuVilleIdVille(Integer idVille);
 
     Optional<Propriete> findByNomIgnoreCase(String nom);
+
+    Optional<Propriete> findFirstByNomIgnoreCase(String nom);
 
     Optional<Propriete> findByNumero(String numero);
 

@@ -19,6 +19,8 @@ public interface PersonneRepository extends JpaRepository<Personne, Integer> {
 
     Optional<Personne> findByNomIgnoreCase(String nom);
 
+    Optional<Personne> findFirstByNomIgnoreCase(String nom);
+
     List<Personne> findByNomContainingIgnoreCase(String nom);
 
     @Query("SELECT p FROM Personne p WHERE " +

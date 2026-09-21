@@ -88,8 +88,9 @@ public class ParcelleService {
                 .nomPropriete(p.getPropriete() != null ? p.getPropriete().getNom() : null)
                 .zonePropriete(p.getPropriete() != null ? p.getPropriete().getZone() : null)
                 .localisationPropriete(p.getPropriete() != null ? p.getPropriete().getLocalisation() : null)
-                .nomVille(p.getPropriete() != null && p.getPropriete().getVille() != null
-                        ? p.getPropriete().getVille().getNomVille() : null)
+                .nomVille(p.getPropriete() != null && p.getPropriete().getLieu() != null
+                    && p.getPropriete().getLieu().getVille() != null
+                    ? p.getPropriete().getLieu().getVille().getNomVille() : null)
                 .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
                 .updatedAt(p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : null)
                 .build();

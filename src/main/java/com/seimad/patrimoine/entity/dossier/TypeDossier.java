@@ -17,6 +17,9 @@ public class TypeDossier {
     @Column(name = "id_type_dossier")
     private Integer idTypeDossier;
 
-    @Column(name = "libelle", nullable = false, unique = true, length = 100)
+    @Column(name = "code", nullable = false, unique = true, length = 30)
+    private String code;
+
+    @Column(name = "libelle", nullable = false, length = 150)
     private String libelle;
 }
