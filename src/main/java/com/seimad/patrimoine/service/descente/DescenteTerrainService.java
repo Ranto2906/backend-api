@@ -172,6 +172,7 @@ public class DescenteTerrainService {
                         .setParameter("idDossier", dp.getDossier().getIdDossier())
                         .getSingleResult();
                 if (demandeur != null) {
+                    map.put("demandeurId", demandeur[0]);
                     map.put("demandeurNom", demandeur[1]);
                     map.put("demandeurContact", demandeur[2]);
                 }
