@@ -650,7 +650,8 @@ public class DossierService {
         });
     }
 
-    private DossierDTO toDTO(Dossier dossier) {
+    /** DTO complet d'un dossier (statut, type, demandeurs, parcelles, suivi) — réutilisé par les autres modules (ex. détail d'une descente terrain). */
+    public DossierDTO toDTO(Dossier dossier) {
         List<DossierDTO.DemandeurDTO> demandeurs = dossierDemandeurRepository
                 .findByIdDossier(dossier.getIdDossier()).stream()
                 .map(dd -> {

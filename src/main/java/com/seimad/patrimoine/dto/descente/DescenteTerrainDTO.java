@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.dto.descente;
 
+import com.seimad.patrimoine.dto.dossier.DossierDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class DescenteTerrainDTO {
@@ -60,4 +61,10 @@ public class DescenteTerrainDTO {
     // Villes (depuis le dossier → ville)
     private Integer idVille;
     private String nomVille;
+
+    /**
+     * Dossier complet rattaché (statut, type, dates, montant, demandeurs,
+     * parcelles, suivi) — peuplé uniquement par /api/descentes-terrain/{id}.
+     */
+    private DossierDTO dossier;
 }

@@ -17,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -86,6 +87,27 @@ public class SecurityConfig {
 
                 // Tout le reste nécessite une authentification
                 .anyRequest().authenticated()
+            )
+
+            // 401 (et non 403) quand l'utilisateur n'est PAS authentifié :
+            // token absent, expiré ou invalide. Sans cela, Spring renvoie 403 par
+            // défaut et les clients (web + mobile) n'activent jamais leur refresh
+            // de token, qui ne se déclenche que sur 401.
+            // Les vrais refus d'autorisation (utilisateur authentifié sans droit)
+            // restent en 403 via l'accessDeniedHandler.
+            .exceptionHandling(exception -> exception
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write(
+                        "{\"error\":\"Non authentifié ou token expiré\",\"status\":401}");
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write(
+                        "{\"error\":\"Accès refusé\",\"status\":403}");
+                })
             )
 
             // Ajouter le filtre JWT

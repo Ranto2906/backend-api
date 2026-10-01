@@ -3,6 +3,7 @@ package com.seimad.patrimoine.service.descente;
 import com.seimad.patrimoine.dto.carte.GeometrieRequest;
 import com.seimad.patrimoine.dto.descente.DescenteTerrainDTO;
 import com.seimad.patrimoine.dto.descente.DescenteTerrainRequest;
+import com.seimad.patrimoine.dto.dossier.DossierDTO;
 import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.descente.DescenteTerrain;
 import com.seimad.patrimoine.entity.dossier.DossierParcelle;
@@ -13,16 +14,20 @@ import com.seimad.patrimoine.repository.descente.DescenteTerrainRepository;
 import com.seimad.patrimoine.repository.dossier.DossierParcelleRepository;
 import com.seimad.patrimoine.repository.notification.PersonneRepository;
 import com.seimad.patrimoine.service.dossier.AuditService;
+import com.seimad.patrimoine.service.dossier.DossierService;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -43,6 +48,7 @@ public class DescenteTerrainService {
     private final UtilisateurRepository utilisateurRepository;
     private final GeometrieRepository geometrieRepository;
     private final AuditService auditService;
+    private final DossierService dossierService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -63,14 +69,42 @@ public class DescenteTerrainService {
     public DescenteTerrainDTO trouverParId(UUID id) {
         DescenteTerrain dt = descenteTerrainRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Descente terrain non trouvée avec l'id : " + id));
-        return toDTO(dt);
+        return avecDossierDetail(toDTO(dt));
+    }
+
+    /**
+     * Complète le DTO avec le dossier détaillé (statut, type, dates, montant,
+     * demandeurs, parcelles, suivi) pour la page de détail du web. En échec
+     * (dossier supprimé entre-temps…), le détail reste absent sans casser l'appel.
+     */
+    private DescenteTerrainDTO avecDossierDetail(DescenteTerrainDTO dto) {
+        if (dto.getIdDossier() == null) return dto;
+        try {
+            return dto.toBuilder()
+                    .dossier(dossierService.trouverParId(dto.getIdDossier()))
+                    .build();
+        } catch (Exception e) {
+            log.warn("Dossier {} introuvable pour la descente {} : {}",
+                    dto.getIdDossier(), dto.getIdDescente(), e.getMessage());
+            return dto;
+        }
     }
 
     @Transactional
     public DescenteTerrainDTO creer(DescenteTerrainRequest request) {
-        Personne personne = resoudrePersonne(request.getIdPersonne());
-        DossierParcelle dossierParcelle = resoudreDossierParcelle(request.getIdDossierParcelle());
+        // Une descente hors ligne peut être synchronisée sans dossier (aucun numéro
+        // embarqué, ou numéro inconnu du serveur) : elle est créée non liée et
+        // l'agent l'associe ensuite au bon dossier depuis l'application web.
+        DossierParcelle dossierParcelle = resoudreDossier(request);
+        Personne personne = resoudrePersonne(request, dossierParcelle);
         Utilisateur utilisateurCreation = resoudreUtilisateur(request.getIdUtilisateurCreation());
+
+        // id_utilisateur_creation reste NOT NULL : mieux vaut un 400 explicite
+        // qu'un 500 opaque.
+        if (utilisateurCreation == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Utilisateur non résolu : reconnectez-vous puis resynchronisez");
+        }
 
         DescenteTerrain dt = DescenteTerrain.builder()
                 .idDescente(UUID.randomUUID())
@@ -155,6 +189,7 @@ public class DescenteTerrainService {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("idDossierParcelle", dp.getIdDossierParcelle());
             map.put("numeroDossier", dp.getDossier() != null ? dp.getDossier().getNumeroDossier() : null);
+            map.put("dateDemande", dp.getDossier() != null ? dp.getDossier().getDateDemande() : null);
             map.put("superficie", dp.getSuperficieM2());
             map.put("parcelle", dp.getParcelle() != null ? dp.getParcelle().getNumeroLot() : null);
                 map.put("ville", dp.getPropriete() != null && dp.getPropriete().getLieu() != null
@@ -199,6 +234,64 @@ public class DescenteTerrainService {
     private Personne resoudrePersonne(Integer idPersonne) {
         return idPersonne != null ? personneRepository.findById(idPersonne)
                 .orElseThrow(() -> new RuntimeException("Personne non trouvée avec l'id : " + idPersonne)) : null;
+    }
+
+    /**
+     * Personne liée à la descente : l'ID s'il est fourni (web), sinon le
+     * demandeur principal du dossier résolu, sinon une personne homonyme du
+     * nom embarqué dans le payload du mobile.
+     */
+    private Personne resoudrePersonne(DescenteTerrainRequest request, DossierParcelle dossierParcelle) {
+        if (request.getIdPersonne() != null) {
+            return resoudrePersonne(request.getIdPersonne());
+        }
+        Integer idDemandeur = demandeurPrincipal(dossierParcelle);
+        if (idDemandeur != null) {
+            return personneRepository.findById(idDemandeur).orElse(null);
+        }
+        String nom = request.getDemandeurNom() == null ? null : request.getDemandeurNom().trim();
+        return nom == null || nom.isEmpty() ? null
+                : personneRepository.findFirstByNomIgnoreCase(nom).orElse(null);
+    }
+
+    /** ID de la personne en rôle « Principal » sur le dossier, ou null. */
+    private Integer demandeurPrincipal(DossierParcelle dossierParcelle) {
+        if (dossierParcelle == null || dossierParcelle.getDossier() == null) return null;
+        try {
+            Object id = entityManager.createNativeQuery(
+                            "SELECT dd.id_personne FROM dossier_demandeur dd " +
+                            "WHERE dd.id_dossier = :idDossier AND dd.role = 'Principal' LIMIT 1")
+                    .setParameter("idDossier", dossierParcelle.getDossier().getIdDossier())
+                    .getSingleResult();
+            return id == null ? null : ((Number) id).intValue();
+        } catch (NoResultException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Ligne dossier_parcelle de la descente : l'ID exact quand il est envoyé
+     * (mode en ligne), sinon résolution depuis le numéro de dossier embarqué
+     * dans le payload du mobile (création hors-ligne). Hors ligne, une descente
+     * sans numéro (ou avec un numéro inconnu du serveur) est acceptée sans lien :
+     * elle sera associée au bon dossier depuis l'application web.
+     */
+    private DossierParcelle resoudreDossier(DescenteTerrainRequest request) {
+        if (request.getIdDossierParcelle() != null) {
+            return resoudreDossierParcelle(request.getIdDossierParcelle());
+        }
+        String numero = request.getDossierNumero() == null ? null : request.getDossierNumero().trim();
+        DossierParcelle trouve = (numero == null || numero.isEmpty()) ? null
+                : dossierParcelleRepository.findFirstByDossier_numeroDossierOrderByDateAjoutAsc(numero)
+                        .orElse(null);
+        if (trouve != null) return trouve;
+        if ("offline".equalsIgnoreCase(request.getMode())) return null;
+        if (numero != null && !numero.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Aucun dossier trouvé avec le numéro « " + numero + " »");
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "La descente doit être rattachée à un dossier (idDossierParcelle ou dossierNumero)");
     }
 
     private DossierParcelle resoudreDossierParcelle(UUID idDossierParcelle) {

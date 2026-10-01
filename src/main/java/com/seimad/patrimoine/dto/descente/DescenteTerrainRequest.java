@@ -43,6 +43,19 @@ public class DescenteTerrainRequest {
     /** ID de la ligne dossier_parcelle. */
     private UUID idDossierParcelle;
 
+    /**
+     * Numéro du dossier (snapshot embarqué par le mobile, notamment hors-ligne).
+     * Sert à résoudre la ligne dossier_parcelle côté serveur quand
+     * {@link #idDossierParcelle} est absent.
+     */
+    private String dossierNumero;
+
+    /**
+     * Nom du demandeur (snapshot du mobile) — fallback pour retrouver la
+     * personne liée quand {@link #idPersonne} est absent du payload.
+     */
+    private String demandeurNom;
+
     // ── Géométrie GPS (optionnelle) ──
 
     private GeometrieRequest geometrie;
