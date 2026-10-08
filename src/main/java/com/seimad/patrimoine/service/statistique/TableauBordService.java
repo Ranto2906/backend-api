@@ -52,15 +52,18 @@ public class TableauBordService {
     // Requêtes (SQL validé sur la base de référence)
     // ─────────────────────────────────────────────────────────────
 
-    /** 1 ligne : total, clôturés, en cours, année courante, montant total. */
+    /** 1 ligne : total, clôturés, en cours, année courante, montant total.
+     *  Montant = vue_ca_theorique (superficie × dernier prix au m², repli
+     *  montant_total) — même règle que la fiche dossier et la synthèse financière. */
     private static final String SQL_KPI_DOSSIERS = """
             SELECT count(*) AS total,
                    count(*) FILTER (WHERE sd.est_final) AS clotures,
                    count(*) FILTER (WHERE sd.est_final IS DISTINCT FROM TRUE) AS en_cours,
                    count(*) FILTER (WHERE d.annee = EXTRACT(YEAR FROM CURRENT_DATE)) AS annee_courante,
-                   COALESCE(sum(d.montant_total), 0) AS montant_total
+                   COALESCE(sum(vt.montant), 0) AS montant_total
             FROM dossier d
             LEFT JOIN statut_dossier sd ON sd.id_statut_dossier = d.id_statut_dossier
+            LEFT JOIN vue_ca_theorique vt ON vt.id_dossier = d.id_dossier
             WHERE TRUE%s
             """;
 
@@ -272,29 +275,30 @@ public class TableauBordService {
             LIMIT 8
             """;
 
-    /** 6 lignes : ville, montant total, nombre de dossiers. */
+    /** Toutes les villes : montant total (vue CA), nombre de dossiers (sans LIMIT —
+     *  la synthèse financière doit totaliser le CA de la période). */
     private static final String SQL_MONTANT_PAR_VILLE = """
-            SELECT COALESCE(v.nom_ville, '(aucune)') AS libelle,
-                   COALESCE(sum(d.montant_total), 0) AS montant,
+            SELECT COALESCE(vt.ville, '(aucune)') AS libelle,
+                   COALESCE(sum(vt.montant), 0) AS montant,
                    count(*) AS nombre
             FROM dossier d
-            LEFT JOIN ville v ON v.id_ville = d.id_ville
+            LEFT JOIN vue_ca_theorique vt ON vt.id_dossier = d.id_dossier
             WHERE TRUE%s
-            GROUP BY COALESCE(v.nom_ville, '(aucune)')
+            GROUP BY COALESCE(vt.ville, '(aucune)')
             ORDER BY montant DESC, nombre DESC
-            LIMIT 6
             """;
 
-    /** 6 lignes : année, montant total, nombre de dossiers. */
+    /** Toutes les années (+ « (sans année) ») : montant total (vue CA), nombre de
+     *  dossiers. Sans la ligne NULL, la somme ne recouperait pas le CA total. */
     private static final String SQL_MONTANT_PAR_ANNEE = """
-            SELECT d.annee::text AS libelle,
-                   COALESCE(sum(d.montant_total), 0) AS montant,
+            SELECT COALESCE(vt.annee::text, '(sans année)') AS libelle,
+                   COALESCE(sum(vt.montant), 0) AS montant,
                    count(*) AS nombre
             FROM dossier d
-            WHERE d.annee IS NOT NULL%s
-            GROUP BY d.annee
-            ORDER BY d.annee DESC
-            LIMIT 6
+            LEFT JOIN vue_ca_theorique vt ON vt.id_dossier = d.id_dossier
+            WHERE TRUE%s
+            GROUP BY COALESCE(vt.annee::text, '(sans année)')
+            ORDER BY libelle DESC
             """;
 
     /** 1 ligne : CA réel — vue des seuls dossiers au statut terminé (est_final). */
