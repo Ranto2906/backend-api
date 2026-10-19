@@ -27,6 +27,9 @@ public class ProprieteRequest {
     @NotNull(message = "Le lieu est obligatoire")
     private Integer idLieu;
 
+    @NotNull(message = "Le type de propriété est obligatoire")
+    private Integer idTypePropriete;
+
     /** Géométrie de la propriété (optionnelle) — point d'ancrage dans la table `geometrie`. */
     private GeometrieRequest geometrie;
 }

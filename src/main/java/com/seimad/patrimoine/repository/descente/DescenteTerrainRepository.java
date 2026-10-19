@@ -39,6 +39,9 @@ public interface DescenteTerrainRepository extends JpaRepository<DescenteTerrain
     /** Au moins une descente terrain rattachée aux lignes dossier_parcelle d'un dossier. */
     boolean existsByDossierParcelleDossierIdDossier(Integer idDossier);
 
+    /** Indique si une ligne dossier-parcelle est référencée par une descente terrain. */
+    boolean existsByDossierParcelleIdDossierParcelle(UUID idDossierParcelle);
+
     /**
      * Numéro max de référence pour un préfixe donné (ex : "DRT-2026-").
      * Utilisé pour générer la référence automatique DRT-AAAA-NNNN.

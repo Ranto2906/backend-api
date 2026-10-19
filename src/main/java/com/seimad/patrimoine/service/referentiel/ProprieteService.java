@@ -3,6 +3,8 @@ package com.seimad.patrimoine.service.referentiel;
 import com.seimad.patrimoine.dto.carte.GeometrieRequest;
 import com.seimad.patrimoine.dto.referentiel.ProprieteDTO;
 import com.seimad.patrimoine.dto.referentiel.ProprieteRequest;
+import com.seimad.patrimoine.dto.referentiel.TypeProprieteDTO;
+import com.seimad.patrimoine.entity.referentiel.TypePropriete;
 import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.referentiel.Propriete;
 import com.seimad.patrimoine.entity.referentiel.Lieu;
@@ -10,6 +12,8 @@ import com.seimad.patrimoine.repository.auth.UtilisateurRepository;
 import com.seimad.patrimoine.repository.carte.GeometrieRepository;
 import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
 import com.seimad.patrimoine.repository.referentiel.LieuRepository;
+import com.seimad.patrimoine.repository.referentiel.TypeProprieteRepository;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,8 +37,10 @@ public class ProprieteService {
 
     private final ProprieteRepository proprieteRepository;
     private final LieuRepository lieuRepository;
+    private final TypeProprieteRepository typeProprieteRepository;
     private final GeometrieRepository geometrieRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final AuditService auditService;
 
     @Transactional(readOnly = true)
     public Page<ProprieteDTO> lister(Pageable pageable) {
@@ -62,16 +68,23 @@ public class ProprieteService {
     public ProprieteDTO creer(ProprieteRequest request) {
         Lieu lieu = lieuRepository.findById(request.getIdLieu())
             .orElseThrow(() -> new RuntimeException("Lieu non trouvé avec l'id : " + request.getIdLieu()));
+        TypePropriete type = typeProprieteRepository.findById(request.getIdTypePropriete())
+            .orElseThrow(() -> new RuntimeException(
+                "Type de propriété non trouvé avec l'id : " + request.getIdTypePropriete()));
         Propriete propriete = Propriete.builder()
                 .nom(request.getNom())
                 .numero(request.getNumero())
                 .zone(request.getZone())
                 .localisation(request.getLocalisation())
                 .superficieTotale(request.getSuperficieTotale())
+                .typePropriete(type)
                 .lieu(lieu)
                 .build();
         Propriete saved = proprieteRepository.save(propriete);
         enregistrerGeometrie(request.getGeometrie(), saved.getIdPropriete());
+        auditService.enregistrer(
+                "propriete", saved.getIdPropriete().toString(), "CREATE", null,
+                snapshot(saved), utilisateurConnecte());
         return toDTO(saved);
     }
 
@@ -81,15 +94,29 @@ public class ProprieteService {
                 .orElseThrow(() -> new RuntimeException("Propriété non trouvée avec l'id : " + id));
         Lieu lieu = lieuRepository.findById(request.getIdLieu())
             .orElseThrow(() -> new RuntimeException("Lieu non trouvé avec l'id : " + request.getIdLieu()));
+        TypePropriete type = typeProprieteRepository.findById(request.getIdTypePropriete())
+            .orElseThrow(() -> new RuntimeException(
+                "Type de propriété non trouvé avec l'id : " + request.getIdTypePropriete()));
+
+        Map<String, Object> anciennes = snapshot(propriete);
         propriete.setNom(request.getNom());
         propriete.setNumero(request.getNumero());
         propriete.setZone(request.getZone());
         propriete.setLocalisation(request.getLocalisation());
         propriete.setSuperficieTotale(request.getSuperficieTotale());
+        propriete.setTypePropriete(type);
         propriete.setLieu(lieu);
         propriete.setUpdatedAt(LocalDateTime.now());
         Propriete saved = proprieteRepository.save(propriete);
-        enregistrerGeometrie(request.getGeometrie(), saved.getIdPropriete());
+
+        // Sémaphore : si les données ont réellement changé, on trace l'audit.
+        Map<String, Object> nouvelles = snapshot(saved);
+        if (!anciennes.equals(nouvelles)) {
+            enregistrerGeometrie(request.getGeometrie(), saved.getIdPropriete());
+            auditService.enregistrer(
+                    "propriete", id.toString(), "UPDATE", anciennes, nouvelles,
+                    utilisateurConnecte());
+        }
         return toDTO(saved);
     }
 
@@ -149,6 +176,7 @@ public class ProprieteService {
                 .zone(p.getZone())
                 .localisation(p.getLocalisation())
                 .superficieTotale(p.getSuperficieTotale())
+                .typePropriete(typeProprieteDTO(p.getTypePropriete()))
                 .idLieu(p.getLieu() != null ? p.getLieu().getIdLieu() : null)
                 .libelleLieu(p.getLieu() != null ? p.getLieu().getLibelle() : null)
                 .idVille(p.getLieu() != null && p.getLieu().getVille() != null ? p.getLieu().getVille().getIdVille() : null)
@@ -156,5 +184,27 @@ public class ProprieteService {
                 .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
                 .updatedAt(p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : null)
                 .build();
+    }
+
+    private TypeProprieteDTO typeProprieteDTO(TypePropriete type) {
+        if (type == null) return null;
+        return TypeProprieteDTO.builder()
+                .idTypePropriete(type.getIdTypePropriete())
+                .libelle(type.getLibelle())
+                .build();
+    }
+
+    private Map<String, Object> snapshot(Propriete p) {
+        Map<String, Object> map = new java.util.HashMap<>();
+        map.put("idPropriete", p.getIdPropriete());
+        map.put("nom", p.getNom());
+        map.put("numero", p.getNumero());
+        map.put("zone", p.getZone());
+        map.put("localisation", p.getLocalisation());
+        map.put("superficieTotale", p.getSuperficieTotale() != null ? p.getSuperficieTotale().toPlainString() : null);
+        map.put("typePropriete", p.getTypePropriete() != null ? p.getTypePropriete().getLibelle() : null);
+        map.put("idLieu", p.getLieu() != null ? p.getLieu().getIdLieu() : null);
+        map.put("libelleLieu", p.getLieu() != null ? p.getLieu().getLibelle() : null);
+        return map;
     }
 }

@@ -1,5 +1,6 @@
 package com.seimad.patrimoine.entity.notification;
 
+import com.seimad.patrimoine.entity.dossier.StatutCouleur;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -32,6 +33,19 @@ public class SuiviNotification {
 
     @Column(name = "actions_a_suivre", columnDefinition = "TEXT")
     private String actionsASuivre;
+
+    // ── Workflow (sur le modèle du suivi de dossier) ──
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_etape_notification")
+    private EtapeNotification etapeNotification;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_statut_couleur")
+    private StatutCouleur statutCouleur;
+
+    @Column(name = "commentaire", columnDefinition = "TEXT")
+    private String commentaire;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_notification", nullable = false)

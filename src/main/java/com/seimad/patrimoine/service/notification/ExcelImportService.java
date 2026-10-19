@@ -102,6 +102,7 @@ public class ExcelImportService {
     private final TypePersonneRepository typePersonneRepository;
     private final PhotoRepository photoRepository;
     private final ProprieteRepository proprieteRepository;
+    private final com.seimad.patrimoine.repository.referentiel.TypeProprieteRepository typeProprieteRepository;
     private final ParcelleRepository parcelleRepository;
     private final VilleRepository villeRepository;
     private final LieuRepository lieuRepository;
@@ -594,6 +595,14 @@ public class ExcelImportService {
      * lorsque le titre est absent, et le numéro est ajouté au nom en cas de
      * conflit avec une propriété existante portant le même titre.
      */
+    /** Type de propriété par défaut pour les propriétés créées par import (colonne NOT NULL). */
+    private com.seimad.patrimoine.entity.referentiel.TypePropriete typeProprieteParDefaut() {
+        return typeProprieteRepository.findFirstByLibelleIgnoreCase("Indéterminé")
+                .orElseGet(() -> typeProprieteRepository.findAll().stream().findFirst()
+                        .orElseThrow(() -> new RuntimeException(
+                                "Aucun type de propriété disponible dans le référentiel")));
+    }
+
     private Propriete obtenirPropriete(String numero,
                                        String nomPropriete,
                                        String zone,
@@ -627,6 +636,7 @@ public class ExcelImportService {
                     .numero(numeroClean)
                     .zone(nettoyer(zone))
                     .localisation(nettoyer(localisation))
+                    .typePropriete(typeProprieteParDefaut())
                     .lieu(lieu)
                     .build();
             proprieteRepository.save(propriete);

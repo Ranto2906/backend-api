@@ -21,6 +21,8 @@ public interface SuiviNotificationRepository extends JpaRepository<SuiviNotifica
 
     long countByNotificationOccupationIdNotification(UUID idNotification);
 
+    boolean existsByEtapeNotificationIdEtapeNotification(Integer idEtapeNotification);
+
     @Query("SELECT s FROM SuiviNotification s WHERE " +
            "(:search IS NULL OR :search = '' OR " +
            "LOWER(s.constats) LIKE LOWER(CONCAT('%',:search,'%')) OR " +

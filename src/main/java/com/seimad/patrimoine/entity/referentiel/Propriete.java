@@ -43,6 +43,12 @@ public class Propriete {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    // ── Type de propriété (V35) ──────────────────────────────────────────
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_type_propriete", nullable = false)
+    private TypePropriete typePropriete;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_lieu")
     private Lieu lieu;

@@ -93,6 +93,7 @@ public class SituationDemandesImportService {
     private final StatutDossierRepository statutDossierRepository;
     private final PersonneRepository personneRepository;
     private final ProprieteRepository proprieteRepository;
+    private final com.seimad.patrimoine.repository.referentiel.TypeProprieteRepository typeProprieteRepository;
     private final LieuRepository lieuRepository;
     private final com.seimad.patrimoine.repository.referentiel.ParcelleRepository parcelleRepository;
     private final DossierParcelleRepository dossierParcelleRepository;
@@ -115,6 +116,7 @@ public class SituationDemandesImportService {
             StatutDossierRepository statutDossierRepository,
             PersonneRepository personneRepository,
             ProprieteRepository proprieteRepository,
+            com.seimad.patrimoine.repository.referentiel.TypeProprieteRepository typeProprieteRepository,
             LieuRepository lieuRepository,
             com.seimad.patrimoine.repository.referentiel.ParcelleRepository parcelleRepository,
             DossierParcelleRepository dossierParcelleRepository,
@@ -129,6 +131,7 @@ public class SituationDemandesImportService {
         this.statutDossierRepository = statutDossierRepository;
         this.personneRepository = personneRepository;
         this.proprieteRepository = proprieteRepository;
+        this.typeProprieteRepository = typeProprieteRepository;
         this.lieuRepository = lieuRepository;
         this.parcelleRepository = parcelleRepository;
         this.dossierParcelleRepository = dossierParcelleRepository;
@@ -378,6 +381,7 @@ public class SituationDemandesImportService {
                             .nom(tronquer(nomPropriete, 200))
                             .numero(tn.isBlank() ? null : tronquer(tn, 50))
                             .localisation(lieu.isBlank() ? null : lieu)
+                            .typePropriete(typeProprieteParDefaut())
                             .lieu(lieuPropriete)
                             .build()));
 
@@ -563,6 +567,14 @@ public class SituationDemandesImportService {
     private Ville trouverOuCreerVille(String nomVille) {
         return villeRepository.findByNomVilleIgnoreCase(nomVille)
                 .orElseGet(() -> villeRepository.save(Ville.builder().nomVille(nomVille).build()));
+    }
+
+    /** Type de propriété par défaut pour les propriétés créées par import (colonne NOT NULL). */
+    private com.seimad.patrimoine.entity.referentiel.TypePropriete typeProprieteParDefaut() {
+        return typeProprieteRepository.findFirstByLibelleIgnoreCase("Indéterminé")
+                .orElseGet(() -> typeProprieteRepository.findAll().stream().findFirst()
+                        .orElseThrow(() -> new RuntimeException(
+                                "Aucun type de propriété disponible dans le référentiel")));
     }
 
     private StatutDossier statutDefaut() {

@@ -47,7 +47,7 @@ public class DescenteTerrain {
 
     @Column(name = "validation", length = 30)
     @Builder.Default
-    private String validation = "En attente";
+    private String validation = "En instance";
 
     @Column(name = "date_validation")
     private LocalDateTime dateValidation;

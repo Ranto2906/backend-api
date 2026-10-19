@@ -19,6 +19,19 @@ public class SuiviNotificationDTO {
     private String constats;
     private String actionsASuivre;
     private UUID idNotification;
+
+    // ── Workflow (sur le modèle du suivi de dossier) ──
+    private Integer idEtapeNotification;
+    private String codeEtape;
+    private String libelleEtape;
+    private Integer ordreEtape;
+    private Boolean etapeFinale;
+    private Integer idStatutCouleur;
+    private String codeStatutCouleur;
+    private String libelleStatutCouleur;
+    private String couleurStatutCouleurHex;
+    private String commentaire;
+
     // Contexte de la notification (pour affichage dans les listes)
     private String numeroPropriete;
     private String numeroLot;

@@ -11,6 +11,9 @@ import java.util.UUID;
 @Repository
 public interface AssignationRepository extends JpaRepository<Assignation, Long> {
 
+    /** Toutes les assignations, de la plus récente à la plus ancienne. */
+    List<Assignation> findAllByOrderByDateAssignationDesc();
+
     List<Assignation> findBySignalementIdSignalementOrderByDateAssignationDesc(UUID idSignalement);
 
     List<Assignation> findByNotificationIdNotification(UUID idNotification);

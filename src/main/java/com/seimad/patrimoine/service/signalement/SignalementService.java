@@ -239,6 +239,43 @@ public class SignalementService {
 
     // ── Assignations (signalement <-> notification / avertissement) ──
 
+    /**
+     * Liste globale des assignations, avec filtres optionnels :
+     * typeCible = "notification" | "avertissement" et q = recherche sur la
+     * référence du signalement ou le numéro de propriété de la cible.
+     */
+    @Transactional(readOnly = true)
+    public List<AssignationDTO> listerToutesAssignations(String typeCible, String q) {
+        List<Assignation> all = assignationRepository.findAllByOrderByDateAssignationDesc();
+        return all.stream()
+                .filter(a -> typeCible == null || typeCible.isBlank()
+                        || typeCible.equalsIgnoreCase(a.getNotification() != null ? "notification" : "avertissement"))
+                .filter(a -> {
+                    if (q == null || q.isBlank()) return true;
+                    String needle = q.toLowerCase();
+                    String ref = a.getSignalement() != null && a.getSignalement().getReference() != null
+                            ? a.getSignalement().getReference().toLowerCase() : "";
+                    String numero = "";
+                    if (a.getNotification() != null && a.getNotification().getPropriete() != null
+                            && a.getNotification().getPropriete().getNumero() != null) {
+                        numero = a.getNotification().getPropriete().getNumero().toLowerCase();
+                    } else if (a.getAvertissement() != null && a.getAvertissement().getPropriete() != null
+                            && a.getAvertissement().getPropriete().getNumero() != null) {
+                        numero = a.getAvertissement().getPropriete().getNumero().toLowerCase();
+                    }
+                    return ref.contains(needle) || numero.contains(needle);
+                })
+                .map(this::toAssignationDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public AssignationDTO trouverAssignation(Long idAssignation) {
+        Assignation a = assignationRepository.findById(idAssignation)
+                .orElseThrow(() -> new RuntimeException("Assignation non trouvée avec l'id : " + idAssignation));
+        return toAssignationDTO(a);
+    }
+
     @Transactional(readOnly = true)
     public List<AssignationDTO> listerAssignations(UUID idSignalement) {
         Signalement signalement = trouverEntite(idSignalement);

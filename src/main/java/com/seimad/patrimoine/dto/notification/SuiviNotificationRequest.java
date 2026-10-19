@@ -19,4 +19,9 @@ public class SuiviNotificationRequest {
     private LocalDate dateSuivi;
     private String constats;
     private String actionsASuivre;
+
+    // ── Workflow (sur le modèle du suivi de dossier) ──
+    private Integer idEtapeNotification;
+    private Integer idStatutCouleur;
+    private String commentaire;
 }

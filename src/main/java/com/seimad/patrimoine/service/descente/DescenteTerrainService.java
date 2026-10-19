@@ -113,7 +113,7 @@ public class DescenteTerrainService {
                 .statutConstat(request.getStatutConstat() != null ? request.getStatutConstat() : "En attente")
                 .observation(request.getObservation())
                 .mode(request.getMode() != null ? request.getMode() : "online")
-                .validation(request.getValidation() != null ? request.getValidation() : "En attente")
+                .validation(request.getValidation() != null ? request.getValidation() : "En instance")
                 .personne(personne)
                 .dossierParcelle(dossierParcelle)
                 .utilisateurCreation(utilisateurCreation)

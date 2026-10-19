@@ -93,7 +93,7 @@ public class TableauBordService {
                     LEFT JOIN statut_signalement ss ON ss.id_statut_signalement = s.id_statut_signalement
                     WHERE ss.est_final IS DISTINCT FROM TRUE%3$s) AS signalements_ouverts,
                    (SELECT count(*) FROM descente_terrain WHERE TRUE%4$s) AS descentes,
-                   (SELECT count(*) FROM descente_terrain WHERE validation = 'En attente'%4$s) AS descentes_attente,
+                   (SELECT count(*) FROM descente_terrain WHERE validation = 'En instance'%4$s) AS descentes_attente,
                    (SELECT count(*) FROM suivi_notification) AS suivis_notification
             """;
 

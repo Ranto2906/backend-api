@@ -106,6 +106,20 @@ public class SignalementController {
 
     // ── Assignations (signalement <-> notification / avertissement) ──
 
+    @GetMapping("/assignations")
+    @Operation(summary = "Lister toutes les assignations (filtres : type = notification|avertissement, q = recherche)")
+    public ResponseEntity<List<AssignationDTO>> listerToutesAssignations(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(signalementService.listerToutesAssignations(type, q));
+    }
+
+    @GetMapping("/assignations/{idAssignation}")
+    @Operation(summary = "Détail d'une assignation")
+    public ResponseEntity<AssignationDTO> trouverAssignation(@PathVariable Long idAssignation) {
+        return ResponseEntity.ok(signalementService.trouverAssignation(idAssignation));
+    }
+
     @GetMapping("/{id}/assignations")
     @Operation(summary = "Assignations d'un signalement (notifications / avertissements)")
     public ResponseEntity<List<AssignationDTO>> listerAssignations(@PathVariable UUID id) {

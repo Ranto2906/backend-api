@@ -200,10 +200,8 @@ public class DossierService {
                 .forEach(dossierDemandeurRepository::delete);
         enregistrerDemandeurs(saved, request.getDemandeurs());
 
-        // ── Parcelles : remplacement complet, montant total recalculé ──
-        dossierParcelleRepository.findByDossier_IdDossierOrderByDateAjoutAsc(id)
-                .forEach(dossierParcelleRepository::delete);
-        enregistrerParcelles(saved, request);
+        // ── Parcelles : mise à jour des lignes existantes, sans supprimer leurs UUID ──
+        synchroniserParcelles(saved, request);
 
         Utilisateur utilisateur = utilisateurConnecte();
         auditService.enregistrer("dossier", id.toString(), "UPDATE",
@@ -456,15 +454,26 @@ public class DossierService {
      *  - montants HT/TTC toujours calculés = superficie × dernier prix au m² de la ville.
      */
     private void enregistrerParcelles(Dossier dossier, DossierRequest request) {
+        synchroniserParcelles(dossier, request);
+    }
+
+    /**
+     * Synchronise les parcelles demandées en conservant les lignes existantes.
+     * Une ligne référencée par une descente terrain n'est jamais supprimée :
+     * son contenu est mis à jour afin de préserver sa clé étrangère.
+     */
+    private void synchroniserParcelles(Dossier dossier, DossierRequest request) {
         List<DossierRequest.ParcelleDemandeeRequest> lignes = request.getParcelles();
-        if (lignes == null || lignes.isEmpty()) return;
-
         PrixM2 prix = dernierPrixVille(dossier.getVille().getIdVille());
-
         BigDecimal totalTtc = BigDecimal.ZERO;
-        List<DossierParcelle> entities = new ArrayList<>();
+        List<DossierParcelle> existantes = dossierParcelleRepository
+                .findByDossier_IdDossierOrderByDateAjoutAsc(dossier.getIdDossier());
+        List<DossierParcelle> utilisees = new ArrayList<>();
+        List<DossierParcelle> aSauvegarder = new ArrayList<>();
+        List<DossierRequest.ParcelleDemandeeRequest> demandes =
+                lignes != null ? lignes : List.of();
 
-        for (DossierRequest.ParcelleDemandeeRequest pr : lignes) {
+        for (DossierRequest.ParcelleDemandeeRequest pr : demandes) {
             Propriete propriete = proprieteRepository.findById(pr.getIdPropriete())
                     .orElseThrow(() -> new RuntimeException(
                             "Propriété non trouvée avec l'id : " + pr.getIdPropriete()));
@@ -488,18 +497,42 @@ public class DossierService {
             }
 
             totalTtc = totalTtc.add(ttc);
+            final Propriete proprieteFinal = propriete;
+            final Parcelle parcelleFinal = parcelle;
 
-            entities.add(DossierParcelle.builder()
-                    .idDossierParcelle(java.util.UUID.randomUUID())
-                    .dossier(dossier)
-                    .propriete(propriete)
-                    .parcelle(parcelle)
-                    .superficieM2(superficie)
-                    .observation(pr.getObservation())
-                    .build());
+            DossierParcelle entity = existantes.stream()
+                    .filter(dp -> !utilisees.contains(dp)
+                            && dp.getPropriete() != null
+                            && dp.getPropriete().getIdPropriete().equals(proprieteFinal.getIdPropriete())
+                            && (dp.getParcelle() == null ? parcelleFinal == null
+                            : parcelleFinal != null && dp.getParcelle().getIdParcelle().equals(parcelleFinal.getIdParcelle())))
+                    .findFirst()
+                    .orElseGet(() -> existantes.stream()
+                            .filter(dp -> !utilisees.contains(dp))
+                            .findFirst()
+                            .orElseGet(() -> DossierParcelle.builder()
+                                    .idDossierParcelle(java.util.UUID.randomUUID())
+                                    .dossier(dossier)
+                                    .build()));
+
+            entity.setDossier(dossier);
+            entity.setPropriete(proprieteFinal);
+            entity.setParcelle(parcelleFinal);
+            entity.setSuperficieM2(superficie);
+            entity.setObservation(pr.getObservation());
+            utilisees.add(entity);
+            aSauvegarder.add(entity);
         }
 
-        dossierParcelleRepository.saveAll(entities);
+        for (DossierParcelle existante : existantes) {
+            if (!utilisees.contains(existante)
+                    && !descenteTerrainRepository.existsByDossierParcelleIdDossierParcelle(
+                    existante.getIdDossierParcelle())) {
+                dossierParcelleRepository.delete(existante);
+            }
+        }
+
+        dossierParcelleRepository.saveAll(aSauvegarder);
 
         if (totalTtc.signum() > 0) {
             dossier.setMontantTotal(totalTtc);

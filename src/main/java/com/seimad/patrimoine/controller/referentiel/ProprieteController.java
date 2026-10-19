@@ -1,8 +1,10 @@
 package com.seimad.patrimoine.controller.referentiel;
 
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.referentiel.ProprieteDTO;
 import com.seimad.patrimoine.dto.referentiel.ProprieteRequest;
 import com.seimad.patrimoine.service.referentiel.ProprieteService;
+import com.seimad.patrimoine.service.dossier.AuditService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class ProprieteController {
 
     private final ProprieteService proprieteService;
+    private final AuditService auditService;
 
     @GetMapping
     @Operation(summary = "Lister les propriétés (pagination)")
@@ -53,6 +56,12 @@ public class ProprieteController {
     @Operation(summary = "Géométrie de la propriété (point d'ancrage PostGIS → GeoJSON)")
     public ResponseEntity<List<Map<String, Object>>> geometrie(@PathVariable Integer id) {
         return ResponseEntity.ok(proprieteService.geometrie(id));
+    }
+
+    @GetMapping("/{id}/historique")
+    @Operation(summary = "Historique des modifications d'une propriété (audit)")
+    public ResponseEntity<List<AuditDTO>> historique(@PathVariable Integer id) {
+        return ResponseEntity.ok(auditService.historiqueEntite("propriete", id.toString()));
     }
 
     @PostMapping

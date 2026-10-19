@@ -1,5 +1,7 @@
 package com.seimad.patrimoine.controller.notification;
 
+import com.seimad.patrimoine.dto.notification.EtapeNotificationDTO;
+import com.seimad.patrimoine.dto.notification.EtapeNotificationRequest;
 import com.seimad.patrimoine.dto.notification.SuiviNotificationDTO;
 import com.seimad.patrimoine.dto.notification.SuiviNotificationRequest;
 import com.seimad.patrimoine.dto.dossier.AuditDTO;
@@ -27,6 +29,38 @@ public class SuiviNotificationController {
 
     private final SuiviNotificationService suiviService;
     private final AuditService auditService;
+
+    // ── Référentiel des étapes (workflow type dossier) ──
+
+    @GetMapping("/etapes")
+    @Operation(summary = "Lister les étapes du suivi de notification")
+    public ResponseEntity<List<EtapeNotificationDTO>> etapes() {
+        return ResponseEntity.ok(suiviService.listerEtapes());
+    }
+
+    @PostMapping("/etapes")
+    @Operation(summary = "Ajouter une étape au workflow de notification")
+    public ResponseEntity<EtapeNotificationDTO> creerEtape(
+            @Valid @RequestBody EtapeNotificationRequest request) {
+        return ResponseEntity.ok(suiviService.creerEtape(request));
+    }
+
+    @PutMapping("/etapes/{id}")
+    @Operation(summary = "Modifier une étape du workflow de notification")
+    public ResponseEntity<EtapeNotificationDTO> modifierEtape(
+            @PathVariable Integer id,
+            @Valid @RequestBody EtapeNotificationRequest request) {
+        return ResponseEntity.ok(suiviService.modifierEtape(id, request));
+    }
+
+    @DeleteMapping("/etapes/{id}")
+    @Operation(summary = "Supprimer une étape (refusée si utilisée dans un suivi)")
+    public ResponseEntity<Void> supprimerEtape(@PathVariable Integer id) {
+        suiviService.supprimerEtape(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── Suivis ──
 
     @GetMapping
     @Operation(summary = "Lister les suivis (pagination)")
