@@ -190,8 +190,8 @@ public class GeometrieCarteService {
         return switch (type) {
             case "Point" -> "{\"type\":\"Point\",\"coordinates\":" + coords + "}";
             case "LineString" -> "{\"type\":\"LineString\",\"coordinates\":[" + coords + "]}";
-            default -> "{\"type\":\"Polygon\",\"coordinates\":[" + coords
-                    + (coords.length() > 0 ? "," : "") + premierPoint(points) + "]}";
+            default -> "{\"type\":\"Polygon\",\"coordinates\":[[" + coords
+                    + (coords.length() > 0 ? "," : "") + premierPoint(points) + "]]}";
         };
     }
 
@@ -219,8 +219,8 @@ public class GeometrieCarteService {
         return switch (type) {
             case "Point" -> "{\"type\":\"Point\",\"coordinates\":" + coords + "}";
             case "LineString" -> "{\"type\":\"LineString\",\"coordinates\":[" + coords + "]}";
-            default -> "{\"type\":\"Polygon\",\"coordinates\":[" + coords
-                    + (coords.length() > 0 ? "," : "") + premierPointWgs84(points, lonLat) + "]}";
+            default -> "{\"type\":\"Polygon\",\"coordinates\":[[" + coords
+                    + (coords.length() > 0 ? "," : "") + premierPointWgs84(points, lonLat) + "]]}";
         };
     }
 

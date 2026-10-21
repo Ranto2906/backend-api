@@ -10,6 +10,7 @@ import com.seimad.patrimoine.entity.dossier.DossierFournie;
 import com.seimad.patrimoine.entity.dossier.StatutCouleur;
 import com.seimad.patrimoine.entity.dossier.StatutDossier;
 import com.seimad.patrimoine.entity.dossier.TypeDossier;
+import com.seimad.patrimoine.service.dossier.DossierPdfService;
 import com.seimad.patrimoine.service.dossier.DossierService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +18,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -36,6 +40,7 @@ import java.util.Map;
 public class DossierController {
 
     private final DossierService dossierService;
+    private final DossierPdfService dossierPdfService;
     private final com.seimad.patrimoine.repository.dossier.EtapeRepository etapeRepository;
     private final com.seimad.patrimoine.repository.dossier.StatutDossierRepository statutDossierRepository;
     private final com.seimad.patrimoine.repository.dossier.TypeDossierRepository typeDossierRepository;
@@ -139,6 +144,27 @@ public class DossierController {
         body.put("prixHt", p.getPrixHt());
         body.put("dateMaj", p.getDateMaj());
         return ResponseEntity.ok(body);
+    }
+
+    // ── GET /api/dossiers/{id}/pdf — document officiel de la demande ──
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> exporterPdf(@PathVariable Integer id) {
+        DossierDTO dossier = dossierService.trouverParId(id);
+
+        String generePar = "inconnu";
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            generePar = auth.getName();
+        }
+
+        byte[] pdf = dossierPdfService.genererPdf(dossier, generePar);
+        String numero = dossier.getNumeroDossier() == null ? String.valueOf(id)
+                : dossier.getNumeroDossier().replaceAll("[^A-Za-z0-9._-]", "_");
+        log.info("Export PDF de la demande {} ({} octets)", dossier.getNumeroDossier(), pdf.length);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"demande-" + numero + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     // ── GET /api/dossiers ──

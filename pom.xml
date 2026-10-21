@@ -54,6 +54,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- OpenPDF — génération du document officiel de demande (PDF A4) -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.43</version>
+        </dependency>
+
         <!-- Lombok (réduction de boilerplate) -->
         <dependency>
             <groupId>org.projectlombok</groupId>

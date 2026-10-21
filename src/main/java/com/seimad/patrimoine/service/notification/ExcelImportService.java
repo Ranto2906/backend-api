@@ -595,12 +595,28 @@ public class ExcelImportService {
      * lorsque le titre est absent, et le numéro est ajouté au nom en cas de
      * conflit avec une propriété existante portant le même titre.
      */
-    /** Type de propriété par défaut pour les propriétés créées par import (colonne NOT NULL). */
-    private com.seimad.patrimoine.entity.referentiel.TypePropriete typeProprieteParDefaut() {
-        return typeProprieteRepository.findFirstByLibelleIgnoreCase("Indéterminé")
-                .orElseGet(() -> typeProprieteRepository.findAll().stream().findFirst()
-                        .orElseThrow(() -> new RuntimeException(
-                                "Aucun type de propriété disponible dans le référentiel")));
+    /**
+     * Type de propriété selon le numéro de propriété / titre foncier :
+     * commence par « PC » → Parcelle cadastrale, sinon → Titre borné
+     * (repli : Indéterminé, puis le premier type du référentiel).
+     */
+    private com.seimad.patrimoine.entity.referentiel.TypePropriete typeProprieteSelonNumeros(String... valeurs) {
+        boolean estParcelleCadastrale = false;
+        if (valeurs != null) {
+            for (String valeur : valeurs) {
+                if (valeur != null
+                        && valeur.trim().toUpperCase(java.util.Locale.ROOT).startsWith("PC")) {
+                    estParcelleCadastrale = true;
+                    break;
+                }
+            }
+        }
+        String libelle = estParcelleCadastrale ? "Parcelle cadastrale" : "Titre borné";
+        return typeProprieteRepository.findFirstByLibelleIgnoreCase(libelle)
+                .orElseGet(() -> typeProprieteRepository.findFirstByLibelleIgnoreCase("Indéterminé")
+                        .orElseGet(() -> typeProprieteRepository.findAll().stream().findFirst()
+                                .orElseThrow(() -> new RuntimeException(
+                                        "Aucun type de propriété disponible dans le référentiel"))));
     }
 
     private Propriete obtenirPropriete(String numero,
@@ -636,7 +652,7 @@ public class ExcelImportService {
                     .numero(numeroClean)
                     .zone(nettoyer(zone))
                     .localisation(nettoyer(localisation))
-                    .typePropriete(typeProprieteParDefaut())
+                    .typePropriete(typeProprieteSelonNumeros(numeroClean, nom))
                     .lieu(lieu)
                     .build();
             proprieteRepository.save(propriete);

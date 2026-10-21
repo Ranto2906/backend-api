@@ -68,7 +68,7 @@ jwt:
 
 # ── Serveur ──
 server:
-  port: 8093
+  port: 8094
 
 # ── Actuator ──
 management:

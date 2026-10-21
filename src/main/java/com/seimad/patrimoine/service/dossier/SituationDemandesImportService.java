@@ -381,7 +381,7 @@ public class SituationDemandesImportService {
                             .nom(tronquer(nomPropriete, 200))
                             .numero(tn.isBlank() ? null : tronquer(tn, 50))
                             .localisation(lieu.isBlank() ? null : lieu)
-                            .typePropriete(typeProprieteParDefaut())
+                            .typePropriete(typeProprieteSelonNumeros(tn, nomPropriete))
                             .lieu(lieuPropriete)
                             .build()));
 
@@ -569,12 +569,28 @@ public class SituationDemandesImportService {
                 .orElseGet(() -> villeRepository.save(Ville.builder().nomVille(nomVille).build()));
     }
 
-    /** Type de propriété par défaut pour les propriétés créées par import (colonne NOT NULL). */
-    private com.seimad.patrimoine.entity.referentiel.TypePropriete typeProprieteParDefaut() {
-        return typeProprieteRepository.findFirstByLibelleIgnoreCase("Indéterminé")
-                .orElseGet(() -> typeProprieteRepository.findAll().stream().findFirst()
-                        .orElseThrow(() -> new RuntimeException(
-                                "Aucun type de propriété disponible dans le référentiel")));
+    /**
+     * Type de propriété selon le numéro de propriété / titre foncier :
+     * commence par « PC » → Parcelle cadastrale, sinon → Titre borné
+     * (repli : Indéterminé, puis le premier type du référentiel).
+     */
+    private com.seimad.patrimoine.entity.referentiel.TypePropriete typeProprieteSelonNumeros(String... valeurs) {
+        boolean estParcelleCadastrale = false;
+        if (valeurs != null) {
+            for (String valeur : valeurs) {
+                if (valeur != null
+                        && valeur.trim().toUpperCase(java.util.Locale.ROOT).startsWith("PC")) {
+                    estParcelleCadastrale = true;
+                    break;
+                }
+            }
+        }
+        String libelle = estParcelleCadastrale ? "Parcelle cadastrale" : "Titre borné";
+        return typeProprieteRepository.findFirstByLibelleIgnoreCase(libelle)
+                .orElseGet(() -> typeProprieteRepository.findFirstByLibelleIgnoreCase("Indéterminé")
+                        .orElseGet(() -> typeProprieteRepository.findAll().stream().findFirst()
+                                .orElseThrow(() -> new RuntimeException(
+                                        "Aucun type de propriété disponible dans le référentiel"))));
     }
 
     private StatutDossier statutDefaut() {
