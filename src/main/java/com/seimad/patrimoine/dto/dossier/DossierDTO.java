@@ -32,6 +32,10 @@ public class DossierDTO {
     private LocalDate dateValidation;
     private BigDecimal montantTotal;
 
+    // ── Prix au m² figé à l'enregistrement du dossier (snapshot) ──
+    private BigDecimal prixM2Ttc;
+    private BigDecimal prixM2Ht;
+
     // ── Statut ──
     private Integer idStatutDossier;
     private String codeStatut;

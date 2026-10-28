@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,6 +15,18 @@ import java.util.UUID;
 public interface DossierParcelleRepository extends JpaRepository<DossierParcelle, UUID> {
 
     List<DossierParcelle> findByDossier_IdDossierOrderByDateAjoutAsc(Integer idDossier);
+
+    /** Lignes rattachées à une propriété (occupation par les dossiers). */
+    List<DossierParcelle> findByPropriete_IdProprieteOrderByDateAjoutAsc(Integer idPropriete);
+
+    /**
+     * Superficie totale occupée sur une propriété par TOUS les dossiers sauf
+     * celui indiqué (les lignes du dossier en cours d'édition ne comptent pas).
+     */
+    @Query("SELECT COALESCE(SUM(dp.superficieM2), 0) FROM DossierParcelle dp " +
+           "WHERE dp.propriete.idPropriete = :idPropriete AND dp.dossier.idDossier <> :idDossier")
+    BigDecimal sommeSuperficieHorsDossier(@Param("idPropriete") Integer idPropriete,
+                                           @Param("idDossier") Integer idDossier);
 
     /**
      * Première ligne dossier_parcelle d'un dossier identifié par son numéro —

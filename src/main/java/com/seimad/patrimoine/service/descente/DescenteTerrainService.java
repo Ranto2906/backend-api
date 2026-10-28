@@ -1,8 +1,13 @@
 package com.seimad.patrimoine.service.descente;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.seimad.patrimoine.dto.carte.GeometrieRequest;
+import com.seimad.patrimoine.dto.descente.DescenteStatutHistoriqueDTO;
 import com.seimad.patrimoine.dto.descente.DescenteTerrainDTO;
 import com.seimad.patrimoine.dto.descente.DescenteTerrainRequest;
+import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.dossier.DossierDTO;
 import com.seimad.patrimoine.entity.auth.Utilisateur;
 import com.seimad.patrimoine.entity.descente.DescenteTerrain;
@@ -32,6 +37,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,9 +56,27 @@ public class DescenteTerrainService {
     private final GeometrieRepository geometrieRepository;
     private final AuditService auditService;
     private final DossierService dossierService;
+    private final ObjectMapper objectMapper;
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    /**
+     * Référentiel du constat de terrain (V38) : les anciennes valeurs
+     * (Conforme / Non conforme / En attente / Occupation illicite /
+     * Construction illegale) sont retirées et refusées explicitement,
+     * plutôt que de laisser échouer la contrainte SQL en 500.
+     */
+    private static final List<String> CONSTATS_VALIDES =
+            List.of("Faisable", "Non faisable", "Sous réserve");
+
+    private void validerConstat(String statutConstat) {
+        if (statutConstat != null && !CONSTATS_VALIDES.contains(statutConstat)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Statut de constat inconnu « " + statutConstat + " » — valeurs attendues : "
+                            + String.join(" / ", CONSTATS_VALIDES));
+        }
+    }
 
     // ── CRUD ──
 
@@ -95,6 +120,7 @@ public class DescenteTerrainService {
         // Une descente hors ligne peut être synchronisée sans dossier (aucun numéro
         // embarqué, ou numéro inconnu du serveur) : elle est créée non liée et
         // l'agent l'associe ensuite au bon dossier depuis l'application web.
+        validerConstat(request.getStatutConstat());
         DossierParcelle dossierParcelle = resoudreDossier(request);
         Personne personne = resoudrePersonne(request, dossierParcelle);
         Utilisateur utilisateurCreation = resoudreUtilisateur(request.getIdUtilisateurCreation());
@@ -110,7 +136,7 @@ public class DescenteTerrainService {
                 .idDescente(UUID.randomUUID())
                 .reference(resoudreReference(request))
                 .dateDescente(request.getDateDescente())
-                .statutConstat(request.getStatutConstat() != null ? request.getStatutConstat() : "En attente")
+                .statutConstat(request.getStatutConstat() != null ? request.getStatutConstat() : "Faisable")
                 .observation(request.getObservation())
                 .mode(request.getMode() != null ? request.getMode() : "online")
                 .validation(request.getValidation() != null ? request.getValidation() : "En instance")
@@ -128,7 +154,7 @@ public class DescenteTerrainService {
         }
 
         auditService.enregistrer("descente_terrain", saved.getIdDescente().toString(), "CREATE",
-                null, valeursAudit(saved));
+                null, valeursAudit(saved), saved.getUtilisateurCreation());
         return toDTO(saved);
     }
 
@@ -137,6 +163,7 @@ public class DescenteTerrainService {
         DescenteTerrain dt = descenteTerrainRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Descente terrain non trouvée avec l'id : " + id));
 
+        validerConstat(request.getStatutConstat());
         Map<String, Object> anciennesValeurs = valeursAudit(dt);
 
         if (request.getDateDescente() != null) dt.setDateDescente(request.getDateDescente());
@@ -156,7 +183,7 @@ public class DescenteTerrainService {
         }
 
         auditService.enregistrer("descente_terrain", id.toString(), "UPDATE",
-                anciennesValeurs, valeursAudit(saved));
+                anciennesValeurs, valeursAudit(saved), auteur(saved));
         return toDTO(saved);
     }
 
@@ -166,9 +193,86 @@ public class DescenteTerrainService {
                 .orElseThrow(() -> new RuntimeException("Descente terrain non trouvée avec l'id : " + id));
 
         Map<String, Object> anciennesValeurs = valeursAudit(dt);
-        auditService.enregistrer("descente_terrain", id.toString(), "DELETE", anciennesValeurs, null);
+        auditService.enregistrer("descente_terrain", id.toString(), "DELETE", anciennesValeurs, null, auteur(dt));
         descenteTerrainRepository.deleteById(id);
         geometrieRepository.supprimerParEntite("descente_terrain", id);
+    }
+
+    // ── Historique des changements de statut ──
+
+    /** Champs de statut suivis dans l'historique (ordre d'affichage). */
+    private static final List<String> CHAMPS_STATUT = List.of("statutConstat", "validation");
+
+    /**
+     * Historique des changements de statut de la descente — statut du constat
+     * et validation — reconstitué du journal d'audit existant : date de
+     * modification, ancien et nouveau statut, auteur, dans l'ordre
+     * chronologique avec l'état initial (création) en tête.
+     */
+    @Transactional(readOnly = true)
+    public List<DescenteStatutHistoriqueDTO> historiqueStatuts(UUID id) {
+        if (!descenteTerrainRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Descente terrain non trouvée avec l'id : " + id);
+        }
+
+        // Le journal est trié du plus récent au plus ancien : on le parcourt à
+        // l'envers pour reconstituer l'évolution dans l'ordre chronologique.
+        List<AuditDTO> journaux = auditService.historiqueEntite("descente_terrain", id.toString());
+        Map<String, String> statutCourant = new HashMap<>();
+        List<DescenteStatutHistoriqueDTO> historique = new ArrayList<>();
+
+        for (int i = journaux.size() - 1; i >= 0; i--) {
+            AuditDTO journal = journaux.get(i);
+            Map<String, Object> avant = lireValeurs(journal.getAnciennesValeurs());
+            Map<String, Object> apres = lireValeurs(journal.getNouvellesValeurs());
+
+            for (String champ : CHAMPS_STATUT) {
+                String nouveau = chaine(apres.get(champ));
+                if (nouveau == null) {
+                    nouveau = chaine(avant.get(champ));
+                }
+                if (nouveau == null) {
+                    continue;
+                }
+                String precedent = statutCourant.get(champ);
+                if (nouveau.equals(precedent)) {
+                    continue;   // action sans changement de statut
+                }
+                historique.add(DescenteStatutHistoriqueDTO.builder()
+                        .champ(champ)
+                        .libelleChamp("statutConstat".equals(champ) ? "Statut du constat" : "Validation")
+                        .ancienStatut(precedent)
+                        .nouveauStatut(nouveau)
+                        .dateModification(journal.getDateAction())
+                        .action(journal.getAction())
+                        .nomUtilisateur(journal.getNomUtilisateur())
+                        .build());
+                statutCourant.put(champ, nouveau);
+            }
+        }
+        return historique;
+    }
+
+    /** Valeurs JSON d'une ligne d'audit (absentes ou illisibles → vide). */
+    private Map<String, Object> lireValeurs(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() { });
+        } catch (JsonProcessingException e) {
+            log.warn("Journal d'audit illisible pour descente_terrain : {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private static String chaine(Object valeur) {
+        if (valeur == null) {
+            return null;
+        }
+        String s = valeur.toString();
+        return s.isBlank() || "null".equals(s) ? null : s;
     }
 
     // ── Statistiques ──
@@ -323,6 +427,15 @@ public class DescenteTerrainService {
         geometrieRepository.upsert("descente_terrain", idDescente, type, geometrie.getGeojson(),
                 precisionM, source, utilisateur.getIdUtilisateur());
         log.info("Géométrie {} enregistrée pour la descente {}", type, idDescente);
+    }
+
+    /**
+     * Auteur d'une action d'audit : l'utilisateur connecté (colonne « Par »
+     * de l'historique des statuts), à défaut celui qui a créé la descente.
+     */
+    private Utilisateur auteur(DescenteTerrain dt) {
+        Utilisateur connecte = resoudreUtilisateur(null);
+        return connecte != null ? connecte : dt.getUtilisateurCreation();
     }
 
     private Map<String, Object> valeursAudit(DescenteTerrain dt) {

@@ -2,14 +2,19 @@ package com.seimad.patrimoine.service.referentiel;
 
 import com.seimad.patrimoine.dto.carte.GeometrieRequest;
 import com.seimad.patrimoine.dto.referentiel.ProprieteDTO;
+import com.seimad.patrimoine.dto.referentiel.ProprieteOccupationDTO;
 import com.seimad.patrimoine.dto.referentiel.ProprieteRequest;
 import com.seimad.patrimoine.dto.referentiel.TypeProprieteDTO;
 import com.seimad.patrimoine.entity.referentiel.TypePropriete;
 import com.seimad.patrimoine.entity.auth.Utilisateur;
+import com.seimad.patrimoine.entity.dossier.DossierDemandeur;
+import com.seimad.patrimoine.entity.dossier.DossierParcelle;
 import com.seimad.patrimoine.entity.referentiel.Propriete;
 import com.seimad.patrimoine.entity.referentiel.Lieu;
 import com.seimad.patrimoine.repository.auth.UtilisateurRepository;
 import com.seimad.patrimoine.repository.carte.GeometrieRepository;
+import com.seimad.patrimoine.repository.dossier.DossierDemandeurRepository;
+import com.seimad.patrimoine.repository.dossier.DossierParcelleRepository;
 import com.seimad.patrimoine.repository.referentiel.ProprieteRepository;
 import com.seimad.patrimoine.repository.referentiel.LieuRepository;
 import com.seimad.patrimoine.repository.referentiel.TypeProprieteRepository;
@@ -25,8 +30,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -36,6 +46,8 @@ import java.util.stream.Collectors;
 public class ProprieteService {
 
     private final ProprieteRepository proprieteRepository;
+    private final DossierParcelleRepository dossierParcelleRepository;
+    private final DossierDemandeurRepository dossierDemandeurRepository;
     private final LieuRepository lieuRepository;
     private final TypeProprieteRepository typeProprieteRepository;
     private final GeometrieRepository geometrieRepository;
@@ -62,6 +74,79 @@ public class ProprieteService {
         Propriete propriete = proprieteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Propriété non trouvée avec l'id : " + id));
         return toDTO(propriete);
+    }
+
+    /**
+     * Dossiers rattachés à une propriété (N° dossier, demandeur, superficie)
+     * et calcul de la superficie restante.
+     *
+     * @param id            propriété concernée
+     * @param exclureDossier dossier à exclure du calcul (édition : ses propres
+     *                       lignes ne réduisent pas le reste disponible)
+     */
+    @Transactional(readOnly = true)
+    public ProprieteOccupationDTO occupation(Integer id, Integer exclureDossier) {
+        Propriete propriete = proprieteRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Propriété non trouvée avec l'id : " + id));
+
+        List<DossierParcelle> lignes = dossierParcelleRepository
+                .findByPropriete_IdProprieteOrderByDateAjoutAsc(id).stream()
+                .filter(dp -> dp.getDossier() != null
+                        && (exclureDossier == null
+                        || !exclureDossier.equals(dp.getDossier().getIdDossier())))
+                .collect(Collectors.toList());
+
+        // ── Agrégation par dossier : numéro + superficie occupée ──
+        Map<Integer, ProprieteOccupationDTO.DossierLieDTO> parDossier = new LinkedHashMap<>();
+        for (DossierParcelle dp : lignes) {
+            Integer idDossier = dp.getDossier().getIdDossier();
+            ProprieteOccupationDTO.DossierLieDTO ligne = parDossier.computeIfAbsent(idDossier, k ->
+                    ProprieteOccupationDTO.DossierLieDTO.builder()
+                            .idDossier(idDossier)
+                            .numeroDossier(dp.getDossier().getNumeroDossier())
+                            .demandeur(null)
+                            .superficieM2(BigDecimal.ZERO)
+                            .build());
+            if (dp.getSuperficieM2() != null) {
+                ligne.setSuperficieM2(ligne.getSuperficieM2().add(dp.getSuperficieM2()));
+            }
+        }
+
+        // ── Demandeur principal de chaque dossier ──
+        if (!parDossier.isEmpty()) {
+            Set<Integer> avecPrincipal = new HashSet<>();
+            for (DossierDemandeur dd : dossierDemandeurRepository.findByIdDossierIn(parDossier.keySet())) {
+                ProprieteOccupationDTO.DossierLieDTO ligne = parDossier.get(dd.getIdDossier());
+                if (ligne == null || dd.getPersonne() == null || dd.getPersonne().getNom() == null) continue;
+                boolean principal = "Principal".equalsIgnoreCase(dd.getRole());
+                if (principal && avecPrincipal.add(dd.getIdDossier())) {
+                    ligne.setDemandeur(dd.getPersonne().getNom());
+                } else {
+                    ligne.setDemandeur(ligne.getDemandeur() != null ? ligne.getDemandeur()
+                            : dd.getPersonne().getNom());
+                }
+            }
+        }
+
+        List<ProprieteOccupationDTO.DossierLieDTO> dossiers = new ArrayList<>(parDossier.values());
+        dossiers.sort((a, b) -> String.valueOf(a.getNumeroDossier())
+                .compareToIgnoreCase(String.valueOf(b.getNumeroDossier())));
+
+        BigDecimal utilisee = dossiers.stream()
+                .map(ProprieteOccupationDTO.DossierLieDTO::getSuperficieM2)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totale = propriete.getSuperficieTotale();
+        BigDecimal restante = totale != null ? totale.subtract(utilisee) : null;
+        boolean disponible = restante == null || restante.signum() > 0;
+
+        return ProprieteOccupationDTO.builder()
+                .idPropriete(id)
+                .superficieTotale(totale)
+                .superficieUtilisee(utilisee)
+                .superficieRestante(restante)
+                .disponible(disponible)
+                .dossiers(dossiers)
+                .build();
     }
 
     @Transactional

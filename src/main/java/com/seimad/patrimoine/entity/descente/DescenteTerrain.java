@@ -36,7 +36,7 @@ public class DescenteTerrain {
 
     @Column(name = "statut_constat", length = 50)
     @Builder.Default
-    private String statutConstat = "En attente";
+    private String statutConstat = "Faisable";
 
     @Column(name = "observation", columnDefinition = "TEXT")
     private String observation;

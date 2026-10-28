@@ -189,9 +189,17 @@ public class DossierService {
         }
                 dossier.setTypeDossier(resoudreTypeDossier(request.getIdTypeDossier()));
                 dossier.setDossierFournie(resoudreDossierFournie(request.getDossierFournie()));
-        dossier.setVille(villeRepository.findById(request.getIdVille())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ville non trouvée avec l'id : " + request.getIdVille())));
         dossier.setDateModification(LocalDateTime.now());
+
+        // Changement de ville : le prix figé ne s'applique plus à la nouvelle
+        // ville — on le réinitialise pour reprendre le prix en vigueur là-bas.
+        Ville nouvelleVille = villeRepository.findById(request.getIdVille())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ville non trouvée avec l'id : " + request.getIdVille()));
+        if (dossier.getVille() == null || !nouvelleVille.getIdVille().equals(dossier.getVille().getIdVille())) {
+            dossier.setPrixM2Ttc(null);
+            dossier.setPrixM2Ht(null);
+        }
+        dossier.setVille(nouvelleVille);
 
         Dossier saved = dossierRepository.save(dossier);
 
@@ -464,7 +472,20 @@ public class DossierService {
      */
     private void synchroniserParcelles(Dossier dossier, DossierRequest request) {
         List<DossierRequest.ParcelleDemandeeRequest> lignes = request.getParcelles();
-        PrixM2 prix = dernierPrixVille(dossier.getVille().getIdVille());
+
+        // ── Prix au m² FIGÉ sur le dossier (snapshot) ──
+        // Pris au moment du premier enregistrement du dossier ; une
+        // modification ultérieure du prix du référentiel ne recalcule
+        // jamais les anciens dossiers ni leurs montants.
+        if (dossier.getPrixM2Ttc() == null) {
+            PrixM2 prixCourant = dernierPrixVille(dossier.getVille().getIdVille());
+            if (prixCourant != null) {
+                dossier.setPrixM2Ttc(prixCourant.getPrixTtc());
+                dossier.setPrixM2Ht(prixCourant.getPrixHt());
+                dossierRepository.save(dossier);
+            }
+        }
+        BigDecimal prixTtcDossier = dossier.getPrixM2Ttc();
         BigDecimal totalTtc = BigDecimal.ZERO;
         List<DossierParcelle> existantes = dossierParcelleRepository
                 .findByDossier_IdDossierOrderByDateAjoutAsc(dossier.getIdDossier());
@@ -472,6 +493,10 @@ public class DossierService {
         List<DossierParcelle> aSauvegarder = new ArrayList<>();
         List<DossierRequest.ParcelleDemandeeRequest> demandes =
                 lignes != null ? lignes : List.of();
+
+        // Superficies demandées par propriété (pour vérifier le reste dispo)
+        Map<Integer, BigDecimal> demandeesParPropriete = new HashMap<>();
+        Map<Integer, Propriete> proprietesConcernees = new HashMap<>();
 
         for (DossierRequest.ParcelleDemandeeRequest pr : demandes) {
             Propriete propriete = proprieteRepository.findById(pr.getIdPropriete())
@@ -490,10 +515,15 @@ public class DossierService {
                     : (parcelle != null && parcelle.getSuperficieM2() != null ? parcelle.getSuperficieM2()
                     : (propriete.getSuperficieTotale() != null ? propriete.getSuperficieTotale() : null));
 
-            // ── Montants : toujours calculés = superficie × prix au m² de la ville ──
+            proprietesConcernees.put(propriete.getIdPropriete(), propriete);
+            if (superficie != null) {
+                demandeesParPropriete.merge(propriete.getIdPropriete(), superficie, BigDecimal::add);
+            }
+
+            // ── Montants : superficie × prix au m² figé sur le dossier ──
             BigDecimal ttc = BigDecimal.ZERO;
-            if (superficie != null && prix != null && prix.getPrixTtc() != null) {
-                ttc = superficie.multiply(prix.getPrixTtc()).setScale(2, java.math.RoundingMode.HALF_UP);
+            if (superficie != null && prixTtcDossier != null) {
+                ttc = superficie.multiply(prixTtcDossier).setScale(2, java.math.RoundingMode.HALF_UP);
             }
 
             totalTtc = totalTtc.add(ttc);
@@ -524,6 +554,9 @@ public class DossierService {
             aSauvegarder.add(entity);
         }
 
+        // ── Superficie restante : refus si la propriété est à 0 ou dépassée ──
+        verifierSuperficiesRestantes(demandeesParPropriete, proprietesConcernees, dossier.getIdDossier());
+
         for (DossierParcelle existante : existantes) {
             if (!utilisees.contains(existante)
                     && !descenteTerrainRepository.existsByDossierParcelleIdDossierParcelle(
@@ -544,6 +577,40 @@ public class DossierService {
     private PrixM2 dernierPrixVille(Integer idVille) {
         List<PrixM2> prix = prixM2Repository.findByVilleIdVilleOrderByDateMajDesc(idVille);
         return prix.isEmpty() ? null : prix.get(0);
+    }
+
+    /**
+     * Vérifie, pour chaque propriété concernée par la demande, qu'il reste de
+     * la superficie libre : si le reste vaut 0, aucune demande ne peut y être
+     * rattachée ; la superficie demandée ne peut pas dépasser le reste.
+     * Les lignes du dossier en cours d'édition sont exclues du calcul.
+     */
+    private void verifierSuperficiesRestantes(Map<Integer, BigDecimal> demandees,
+                                              Map<Integer, Propriete> proprietes,
+                                              Integer idDossier) {
+        for (Map.Entry<Integer, BigDecimal> entree : demandees.entrySet()) {
+            Propriete propriete = proprietes.get(entree.getKey());
+            if (propriete == null || propriete.getSuperficieTotale() == null) continue;
+
+            BigDecimal dejaUtilisee = dossierParcelleRepository
+                    .sommeSuperficieHorsDossier(entree.getKey(), idDossier);
+            BigDecimal restante = propriete.getSuperficieTotale()
+                    .subtract(dejaUtilisee != null ? dejaUtilisee : BigDecimal.ZERO);
+
+            if (restante.signum() <= 0) {
+                throw new RuntimeException(
+                        "La propriété « " + propriete.getNom()
+                                + " » n'a plus de superficie libre (0 m² restant) : "
+                                + "aucune demande ne peut y être rattachée.");
+            }
+            if (entree.getValue().compareTo(restante) > 0) {
+                throw new RuntimeException(
+                        "Superficie demandée sur « " + propriete.getNom() + " » ("
+                                + entree.getValue().stripTrailingZeros().toPlainString()
+                                + " m²) supérieure au reste disponible ("
+                                + restante.stripTrailingZeros().toPlainString() + " m²).");
+            }
+        }
     }
 
     private DossierDTO.ParcelleDemandeeDTO toParcelleDTO(DossierParcelle dp) {
@@ -736,6 +803,8 @@ public class DossierService {
                 .dateModification(dossier.getDateModification())
                 .dateValidation(dossier.getDateValidation())
                 .montantTotal(dossier.getMontantTotal())
+                .prixM2Ttc(dossier.getPrixM2Ttc())
+                .prixM2Ht(dossier.getPrixM2Ht())
                 .idStatutDossier(dossier.getStatutDossier() != null ? dossier.getStatutDossier().getIdStatutDossier() : null)
                 .codeStatut(dossier.getStatutDossier() != null ? dossier.getStatutDossier().getCode() : null)
                 .libelleStatut(dossier.getStatutDossier() != null ? dossier.getStatutDossier().getLibelle() : null)
@@ -785,6 +854,7 @@ public class DossierService {
         map.put("observation", d.getObservation());
         map.put("dateValidation", d.getDateValidation() != null ? d.getDateValidation().toString() : null);
         map.put("montantTotal", d.getMontantTotal() != null ? d.getMontantTotal().toString() : null);
+        map.put("prixM2Ttc", d.getPrixM2Ttc() != null ? d.getPrixM2Ttc().toString() : null);
         map.put("statut", d.getStatutDossier() != null ? d.getStatutDossier().getLibelle() : null);
         map.put("typeDossier", d.getTypeDossier() != null ? d.getTypeDossier().getLibelle() : null);
         map.put("dossierFournie", d.getDossierFournie() != null ? d.getDossierFournie().getLibelle() : null);

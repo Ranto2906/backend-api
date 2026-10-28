@@ -7,7 +7,7 @@ spring:
 
   # ── Datasource PostgreSQL ──
   datasource:
-    url: jdbc:postgresql://localhost:5432/patrimoine
+    url: jdbc:postgresql://localhost:5432/finalpatrimoine
     username: postgres
     password: r
     driver-class-name: org.postgresql.Driver
@@ -68,7 +68,7 @@ jwt:
 
 # ── Serveur ──
 server:
-  port: 8094
+  port: 8093
 
 # ── Actuator ──
 management:

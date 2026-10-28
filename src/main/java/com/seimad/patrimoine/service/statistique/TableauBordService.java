@@ -53,8 +53,9 @@ public class TableauBordService {
     // ─────────────────────────────────────────────────────────────
 
     /** 1 ligne : total, clôturés, en cours, année courante, montant total.
-     *  Montant = vue_ca_theorique (superficie × dernier prix au m², repli
-     *  montant_total) — même règle que la fiche dossier et la synthèse financière. */
+     *  Montant = vue_ca_theorique : montant ENREGISTRÉ du dossier (prix au m²
+     *  figé à son enregistrement) — modifier un prix du référentiel ne change
+     *  donc jamais les montants historiques. */
     private static final String SQL_KPI_DOSSIERS = """
             SELECT count(*) AS total,
                    count(*) FILTER (WHERE sd.est_final) AS clotures,

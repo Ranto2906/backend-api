@@ -55,6 +55,19 @@ public class Dossier {
     @Builder.Default
     private BigDecimal montantTotal = BigDecimal.ZERO;
 
+    /**
+     * Prix au m² TTC figé au moment de l'enregistrement du dossier.
+     * Une modification ultérieure du prix du référentiel ne change jamais
+     * les anciens dossiers : seules les nouvelles demandes prennent le
+     * prix en vigueur.
+     */
+    @Column(name = "prix_m2_ttc", precision = 14, scale = 2)
+    private BigDecimal prixM2Ttc;
+
+    /** Prix au m² HT figé au moment de l'enregistrement du dossier. */
+    @Column(name = "prix_m2_ht", precision = 14, scale = 2)
+    private BigDecimal prixM2Ht;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_statut_dossier")
     private StatutDossier statutDossier;

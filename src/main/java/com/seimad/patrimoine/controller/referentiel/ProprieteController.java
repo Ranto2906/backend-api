@@ -2,6 +2,7 @@ package com.seimad.patrimoine.controller.referentiel;
 
 import com.seimad.patrimoine.dto.dossier.AuditDTO;
 import com.seimad.patrimoine.dto.referentiel.ProprieteDTO;
+import com.seimad.patrimoine.dto.referentiel.ProprieteOccupationDTO;
 import com.seimad.patrimoine.dto.referentiel.ProprieteRequest;
 import com.seimad.patrimoine.service.referentiel.ProprieteService;
 import com.seimad.patrimoine.service.dossier.AuditService;
@@ -56,6 +57,17 @@ public class ProprieteController {
     @Operation(summary = "Géométrie de la propriété (point d'ancrage PostGIS → GeoJSON)")
     public ResponseEntity<List<Map<String, Object>>> geometrie(@PathVariable Integer id) {
         return ResponseEntity.ok(proprieteService.geometrie(id));
+    }
+
+    @GetMapping("/{id}/dossiers")
+    @Operation(summary = "Dossiers rattachés à une propriété + superficie restante",
+            description = "Lorsque la superficie restante vaut 0, plus aucune demande "
+                    + "ne peut être rattachée à la propriété. Paramètre exclureDossier "
+                    + "utilisé en édition pour ne pas compter le dossier en cours.")
+    public ResponseEntity<ProprieteOccupationDTO> dossiers(
+            @PathVariable Integer id,
+            @RequestParam(required = false) Integer exclureDossier) {
+        return ResponseEntity.ok(proprieteService.occupation(id, exclureDossier));
     }
 
     @GetMapping("/{id}/historique")

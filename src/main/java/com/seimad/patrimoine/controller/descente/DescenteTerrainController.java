@@ -1,15 +1,21 @@
 package com.seimad.patrimoine.controller.descente;
 
+import com.seimad.patrimoine.dto.descente.DescenteStatutHistoriqueDTO;
 import com.seimad.patrimoine.dto.descente.DescenteTerrainDTO;
 import com.seimad.patrimoine.dto.descente.DescenteTerrainRequest;
+import com.seimad.patrimoine.service.descente.DescenteTerrainPdfService;
 import com.seimad.patrimoine.service.descente.DescenteTerrainService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +30,7 @@ import java.util.UUID;
 public class DescenteTerrainController {
 
     private final DescenteTerrainService descenteTerrainService;
+    private final DescenteTerrainPdfService descenteTerrainPdfService;
 
     // ── GET /api/descentes-terrain ──
     @GetMapping
@@ -46,6 +53,36 @@ public class DescenteTerrainController {
     @GetMapping("/{id}")
     public ResponseEntity<DescenteTerrainDTO> trouverParId(@PathVariable UUID id) {
         return ResponseEntity.ok(descenteTerrainService.trouverParId(id));
+    }
+
+    // ── GET /api/descentes-terrain/{id}/historique-statuts — historique des
+    // changements de statut (constat + validation) : date de modification, statut ──
+    @GetMapping("/{id}/historique-statuts")
+    @Operation(summary = "Historique des changements de statut d'une descente",
+            description = "Reconstitué du journal d'audit : date de modification, ancien et nouveau statut, auteur")
+    public ResponseEntity<List<DescenteStatutHistoriqueDTO>> historiqueStatuts(@PathVariable UUID id) {
+        return ResponseEntity.ok(descenteTerrainService.historiqueStatuts(id));
+    }
+
+    // ── GET /api/descentes-terrain/{id}/pdf — fiche de descente terrain ──
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> exporterPdf(@PathVariable UUID id) {
+        DescenteTerrainDTO descente = descenteTerrainService.trouverParId(id);
+
+        String generePar = "inconnu";
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            generePar = auth.getName();
+        }
+
+        byte[] pdf = descenteTerrainPdfService.genererPdf(descente, generePar);
+        String reference = descente.getReference() == null ? String.valueOf(id)
+                : descente.getReference().replaceAll("[^A-Za-z0-9._-]", "_");
+        log.info("Export PDF de la descente {} ({} octets)", descente.getReference(), pdf.length);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"descente-" + reference + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     // ── POST /api/descentes-terrain ──

@@ -263,9 +263,11 @@ public class DossierPdfService {
 
     private void sectionEvaluation(Document document, DossierDTO d) throws DocumentException {
         PdfPTable t = tableau(new float[]{34, 20, 46});
-        BigDecimal prixTtc = null;
-        BigDecimal prixHt = null;
-        if (d.getIdVille() != null) {
+        // ── Prix au m² FIGÉ sur le dossier (en vigueur à son enregistrement).
+        // Repli sur le prix courant uniquement pour les dossiers hérités sans snapshot. ──
+        BigDecimal prixTtc = d.getPrixM2Ttc();
+        BigDecimal prixHt = d.getPrixM2Ht();
+        if (prixTtc == null && d.getIdVille() != null) {
             List<com.seimad.patrimoine.entity.referentiel.PrixM2> prix =
                     prixM2Repository.findByVilleIdVilleOrderByDateMajDesc(d.getIdVille());
             if (!prix.isEmpty()) {
@@ -273,8 +275,8 @@ public class DossierPdfService {
                 prixHt = prix.get(0).getPrixHt();
             }
         }
-        ajouterLigneInfo(t, "Prix au m² de la ville (TTC)", prixTtc != null ? nombre(prixTtc) + " Ar/m²" : "—");
-        ajouterLigneInfo(t, "Prix au m² de la ville (HT)", prixHt != null ? nombre(prixHt) + " Ar/m²" : "—");
+        ajouterLigneInfo(t, "Prix au m² retenu (TTC)", prixTtc != null ? nombre(prixTtc) + " Ar/m²" : "—");
+        ajouterLigneInfo(t, "Prix au m² retenu (HT)", prixHt != null ? nombre(prixHt) + " Ar/m²" : "—");
         ajouterLigneInfo(t, "Montant total de la demande",
                 d.getMontantTotal() != null ? nombre(d.getMontantTotal()) + " Ar" : "—");
         document.add(t);
